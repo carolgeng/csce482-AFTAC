@@ -8,7 +8,8 @@ import json
 import logging
 
 from flask import Flask, jsonify
-from db import db
+from database import db
+
 from config import Config
 from dotenv import load_dotenv
 
