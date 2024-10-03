@@ -1,5 +1,9 @@
 from database import db
 
+class PaperAuthors(db.Model):
+    __tablename__ = 'paper_authors'
+    paper_id = db.Column(db.Integer, db.ForeignKey('papers.id'), primary_key=True)
+    author_id = db.Column(db.Integer, db.ForeignKey('authors.id'), primary_key=True)
 
 class Paper(db.Model):
     __tablename__ = 'papers'
@@ -14,7 +18,9 @@ class Paper(db.Model):
     rank_citations_per_year = db.Column(db.Integer)
 
     journal = db.relationship('Journal', back_populates='papers')
-
+    
+    # Define many-to-many relationship with authors
+    authors = db.relationship('Author', secondary='paper_authors', back_populates='papers')
 
 class Author(db.Model):
     __tablename__ = 'authors'
@@ -29,8 +35,8 @@ class Author(db.Model):
     delta_total_papers = db.Column(db.Integer)
     recent_coauthors = db.Column(db.Integer)
 
+    # Define many-to-many relationship with papers
     papers = db.relationship('Paper', secondary='paper_authors', back_populates='authors')
-
 
 class Journal(db.Model):
     __tablename__ = 'journals'
@@ -46,7 +52,6 @@ class Journal(db.Model):
 
     papers = db.relationship('Paper', back_populates='journal')
 
-
 class Citation(db.Model):
     __tablename__ = 'citations'
     id = db.Column(db.Integer, primary_key=True)
@@ -57,9 +62,3 @@ class Citation(db.Model):
 
     paper = db.relationship('Paper')
     author = db.relationship('Author')
-
-
-class PaperAuthors(db.Model):
-    __tablename__ = 'paper_authors'
-    paper_id = db.Column(db.Integer, db.ForeignKey('papers.id'), primary_key=True)
-    author_id = db.Column(db.Integer, db.ForeignKey('authors.id'), primary_key=True)
