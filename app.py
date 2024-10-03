@@ -1,3 +1,4 @@
+# app.py
 import os
 import re
 import requests
@@ -9,9 +10,9 @@ import logging
 from datetime import datetime
 
 from flask import Flask, jsonify
-from database import db
 from dotenv import load_dotenv
 
+from database import db
 from flask_migrate import Migrate
 
 load_dotenv()
@@ -27,10 +28,12 @@ if database_url.startswith("postgres://"):
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# Initialize the db with the Flask app
 db.init_app(app)
 migrate = Migrate(app, db)
 
-from models import Paper, Author, paper_authors
+# Import models after initializing db
+from models import Paper, Author, Journal, paper_authors
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -45,14 +48,36 @@ total_papers_processed = 0
 papers_saved = 0
 papers_skipped = 0
 
+def normalize_text(text):
+    # Remove special characters and extra whitespace
+    text = re.sub(r'\W+', ' ', text)
+    return text.strip().lower()
+
 def is_relevant_paper(title, abstract):
-    keywords = ['machine learning', 'artificial intelligence', 'deep learning', 'neural network', 'AI', 'ML']
+    keywords = [
+        'machine learning', 'artificial intelligence', 'deep learning', 'neural network',
+        'data mining', 'natural language processing', 'computer vision',
+        'reinforcement learning', 'supervised learning', 'unsupervised learning',
+        'classification', 'regression', 'clustering', 'support vector machine',
+        'random forest', 'decision tree', 'convolutional neural network', 'cnn', 'rnn',
+        'recurrent neural network', 'transformer', 'bert', 'gpt', 'algorithm', 'model',
+        'predictive analytics', 'pattern recognition', 'data science', 'k-means',
+        'svm', 'naive bayes', 'bayesian network', 'ensemble learning', 'gradient boosting',
+        'xgboost', 'lstm', 'long short-term memory', 'autoencoder', 'generative adversarial network',
+        'gan', 'k-nearest neighbors', 'knn', 'artificial neural network', 'perceptron',
+        'dropout', 'batch normalization', 'hyperparameter tuning', 'feature extraction',
+        'feature selection', 'dimensionality reduction', 'pca', 'principal component analysis',
+        'tsne', 'stochastic gradient descent', 'sgd', 'backpropagation', 'loss function',
+        'activation function', 'cross-validation', 'overfitting', 'underfitting', 'bias-variance tradeoff'
+    ]
     content = ''
     if title:
-        content += title.lower()
+        content += normalize_text(title)
     if abstract:
-        content += ' ' + abstract.lower()
-    return any(keyword in content for keyword in keywords)
+        content += ' ' + normalize_text(abstract)
+    # Combine keywords into a regex pattern
+    pattern = r'\b(' + '|'.join(map(re.escape, keywords)) + r')\b'
+    return re.search(pattern, content) is not None
 
 def save_paper_to_db(paper_data):
     global total_papers_processed, papers_saved, papers_skipped
@@ -106,6 +131,8 @@ def save_paper_to_db(paper_data):
                         title = text[start:end].strip()
                     except (ValueError, TypeError) as e:
                         logging.error(f"Invalid indices in title annotation: {ann} | Error: {e}")
+            else:
+                logging.error("Title annotations are missing or None.")
 
             # Process abstract
             abstract_annotations_data = annotations.get('abstract')
@@ -135,6 +162,12 @@ def save_paper_to_db(paper_data):
                             abstract = abstract[:max_abstract_length] + '...'
                     except (ValueError, TypeError) as e:
                         logging.error(f"Invalid indices in abstract annotation: {ann} | Error: {e}")
+            else:
+                logging.error("Abstract annotations are missing or None.")
+
+            # Log extracted title and abstract
+            logging.info(f"Extracted title: {title}")
+            logging.info(f"Extracted abstract: {abstract}")
 
             # Extract publication year
             year = extract_publication_year(text, annotations)
@@ -172,6 +205,8 @@ def save_paper_to_db(paper_data):
                             authors_list.append(author_name)
                     except (ValueError, TypeError) as e:
                         logging.error(f"Invalid indices in author annotation: {ann} | Error: {e}")
+            else:
+                logging.error("Author annotations are missing or None.")
 
             # Save the paper
             existing_paper = Paper.query.filter_by(title=title).first()
