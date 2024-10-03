@@ -14,7 +14,6 @@ from dotenv import load_dotenv
 
 from flask_migrate import Migrate
 
-
 load_dotenv()
 app = Flask(__name__)
 
@@ -31,7 +30,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 migrate = Migrate(app, db)
 
-from models import Paper, Author, Journal, Citation
+from models import Paper, Author, Journal, Citation, PaperExternalIds, PaperFigures
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -42,7 +41,7 @@ LOCAL_PATH = "/Users/alecklem/aftac"
 os.makedirs(LOCAL_PATH, exist_ok=True)
 
 def save_author_to_db(author_data):
-    author_name = author_data['name']
+    author_name = author_data.get('name')
     existing_author = Author.query.filter_by(name=author_name).first()
     if not existing_author:
         new_author = Author(name=author_name)
@@ -51,12 +50,33 @@ def save_author_to_db(author_data):
         return new_author
     return existing_author
 
+def save_external_ids_to_db(paper, external_ids_data):
+    external_ids = PaperExternalIds(
+        paper_id=paper.id,
+        arxiv_id=external_ids_data.get('arxiv'),
+        doi=external_ids_data.get('doi'),
+        pubmed_id=external_ids_data.get('pubmed'),
+        dblp_id=external_ids_data.get('dblp')
+    )
+    db.session.add(external_ids)
+    db.session.commit()
+
+def save_figures_to_db(paper, figure_data):
+    for figure in figure_data:
+        figure_url = figure.get('attributes', {}).get('id')
+        caption = figure.get('caption', None)
+        new_figure = PaperFigures(paper_id=paper.id, figure_url=figure_url, caption=caption)
+        db.session.add(new_figure)
+    db.session.commit()
+
 def save_paper_to_db(paper_data):
     try:
         title = paper_data.get('title', None)
         abstract = paper_data.get('abstract', None)
         year = paper_data.get('year', None)
         total_citations = len(paper_data.get('citations', []))
+        doi = paper_data.get('externalids', {}).get('doi', None)
+        pdf_url = paper_data.get('content', {}).get('source', {}).get('oainfo', {}).get('openaccessurl', None)
 
         existing_paper = Paper.query.filter_by(title=title).first()
         if not existing_paper:
@@ -64,15 +84,26 @@ def save_paper_to_db(paper_data):
                 title=title,
                 abstract=abstract,
                 publication_year=year,
-                total_citations=total_citations
+                total_citations=total_citations,
+                doi=doi,
+                pdf_url=pdf_url
             )
             db.session.add(new_paper)
 
+            # Save external IDs if present
+            if 'externalids' in paper_data:
+                save_external_ids_to_db(new_paper, paper_data['externalids'])
+
+            # Save authors
             if 'authors' in paper_data:
                 for author in paper_data['authors']:
                     new_author = save_author_to_db(author)
                     paper_author = PaperAuthors(paper_id=new_paper.id, author_id=new_author.id)
                     db.session.add(paper_author)
+
+            # Save figures if available
+            if 'figure' in paper_data:
+                save_figures_to_db(new_paper, paper_data['figure'])
             
             db.session.commit()  # Commit after processing everything
 

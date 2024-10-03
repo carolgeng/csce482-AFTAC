@@ -5,6 +5,22 @@ class PaperAuthors(db.Model):
     paper_id = db.Column(db.Integer, db.ForeignKey('papers.id'), primary_key=True)
     author_id = db.Column(db.Integer, db.ForeignKey('authors.id'), primary_key=True)
 
+class PaperExternalIds(db.Model):
+    __tablename__ = 'paper_external_ids'
+    id = db.Column(db.Integer, primary_key=True)
+    paper_id = db.Column(db.Integer, db.ForeignKey('papers.id'))
+    arxiv_id = db.Column(db.String(255))
+    doi = db.Column(db.String(255))
+    pubmed_id = db.Column(db.String(255))
+    dblp_id = db.Column(db.String(255))
+
+class PaperFigures(db.Model):
+    __tablename__ = 'paper_figures'
+    id = db.Column(db.Integer, primary_key=True)
+    paper_id = db.Column(db.Integer, db.ForeignKey('papers.id'))
+    figure_url = db.Column(db.String(255))
+    caption = db.Column(db.Text)
+
 class Paper(db.Model):
     __tablename__ = 'papers'
     id = db.Column(db.Integer, primary_key=True)
@@ -16,11 +32,16 @@ class Paper(db.Model):
     max_citations = db.Column(db.Integer)
     citations_per_year = db.Column(db.Integer)
     rank_citations_per_year = db.Column(db.Integer)
+    pdf_url = db.Column(db.String(255))  # Add PDF URL field
+    doi = db.Column(db.String(255))  # Add DOI field
 
     journal = db.relationship('Journal', back_populates='papers')
     
     # Define many-to-many relationship with authors
     authors = db.relationship('Author', secondary='paper_authors', back_populates='papers')
+
+    figures = db.relationship('PaperFigures', backref='paper')  # Link figures to paper
+    external_ids = db.relationship('PaperExternalIds', backref='paper')  # Link external IDs to paper
 
 class Author(db.Model):
     __tablename__ = 'authors'
