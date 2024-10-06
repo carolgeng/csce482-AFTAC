@@ -40,7 +40,7 @@ logging.basicConfig(level=logging.INFO)
 
 API_KEY = os.environ.get("SEMANTIC_SCHOLAR_API_KEY")
 DATASET_NAME = "s2orc"
-LOCAL_PATH = "/Users/alecklem/aftac"
+LOCAL_PATH = os.getcwd()
 os.makedirs(LOCAL_PATH, exist_ok=True)
 
 # Initialize counters
