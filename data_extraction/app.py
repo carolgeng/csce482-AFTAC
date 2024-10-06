@@ -38,15 +38,17 @@ from models import Paper, Author, Journal, paper_authors
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 
-API_KEY = os.environ.get("SEMANTIC_SCHOLAR_API_KEY")
 DATASET_NAME = "s2orc"
+API_KEY = os.environ.get("SEMANTIC_SCHOLAR_API_KEY")
+
 LOCAL_PATH = os.getcwd()
 os.makedirs(LOCAL_PATH, exist_ok=True)
 
 # Initialize counters
-total_papers_processed = 0
 papers_saved = 0
 papers_skipped = 0
+total_papers_processed = 0
+
 
 def normalize_text(text):
     # Remove special characters and extra whitespace
@@ -70,11 +72,13 @@ def is_relevant_paper(title, abstract):
         'tsne', 'stochastic gradient descent', 'sgd', 'backpropagation', 'loss function',
         'activation function', 'cross-validation', 'overfitting', 'underfitting', 'bias-variance tradeoff'
     ]
+
     content = ''
-    if title:
+    if title: 
         content += normalize_text(title)
-    if abstract:
+    if abstract: 
         content += ' ' + normalize_text(abstract)
+
     # Combine keywords into a regex pattern
     pattern = r'\b(' + '|'.join(map(re.escape, keywords)) + r')\b'
     return re.search(pattern, content) is not None

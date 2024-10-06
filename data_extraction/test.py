@@ -4,7 +4,8 @@ import gzip
 import os
 
 from dotenv import load_dotenv
-load_dotenv
+
+load_dotenv()
 # Make sure your API key is set
 API_KEY = os.environ.get("SEMANTIC_SCHOLAR_API_KEY")
 DATASET_NAME = "s2orc"
