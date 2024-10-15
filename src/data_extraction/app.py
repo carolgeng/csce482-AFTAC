@@ -12,7 +12,7 @@ from datetime import datetime
 from flask import Flask, jsonify
 from dotenv import load_dotenv
 
-from database import db
+from src.data_extraction.database import db
 from flask_migrate import Migrate
 
 load_dotenv()
@@ -33,7 +33,8 @@ db.init_app(app)
 migrate = Migrate(app, db)
 
 # Import models after initializing db
-from models import Paper, Author, Journal, paper_authors
+from src.data_extraction.models import Paper, Author, Journal, paper_authors
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

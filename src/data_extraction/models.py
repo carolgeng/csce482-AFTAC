@@ -1,5 +1,6 @@
 # models.py
-from database import db
+from src.data_extraction.database import db
+
 
 # Association table for the many-to-many relationship between papers and authors
 paper_authors = db.Table('paper_authors',
