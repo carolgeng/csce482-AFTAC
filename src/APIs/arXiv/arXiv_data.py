@@ -6,8 +6,16 @@ class arxiv_api_handler:
 
     def query(self, query, max_results):
         search = arxiv.Search(
-            query,
-            max_results = max_results,
-            sort_by= arxiv.SortCriterion.Relevance
+            query=query,
+            sort_by=arxiv.SortCriterion.Relevance
         )
-        return self.client.results(search)
+        # Generator function to yield results with a DOI
+        def results_with_doi():
+            count = 0
+            for result in self.client.results(search):
+                if result.doi:
+                    yield result
+                    count += 1
+                    if count >= max_results:
+                        break
+        return results_with_doi()
