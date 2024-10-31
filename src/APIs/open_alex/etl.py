@@ -2,7 +2,7 @@
 import requests
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from models import Base, Paper, Author, Journal, Citation, PaperAuthor
+from models import Paper, Author, Journal, Citation, PaperAuthor
 from config import DATABASE_URL
 import datetime
 import time
@@ -38,7 +38,20 @@ def fetch_papers(query, per_page=200, max_pages=5):
 
 def process_papers(papers):
     for paper_data in papers:
-        paper_id = paper_data['id']
+        # Check if paper already exists based on DOI
+        doi = paper_data.get('doi')
+        existing_paper = None
+        if doi:
+            existing_paper = session.query(Paper).filter_by(doi=doi).first()
+        else:
+            # If no DOI, use title to check for duplicates
+            title = paper_data.get('title')
+            existing_paper = session.query(Paper).filter_by(title=title).first()
+
+        if existing_paper:
+            continue  # Skip if paper already exists
+
+        # Proceed to add new paper
         title = paper_data.get('title')
         abstract_inverted_index = paper_data.get('abstract_inverted_index')
         if abstract_inverted_index:
@@ -49,40 +62,42 @@ def process_papers(papers):
         publication_date = paper_data.get('publication_date')
         if publication_date:
             try:
-                publication_date = datetime.datetime.strptime(publication_date, '%Y-%m-%d').date()
+                publication_year = datetime.datetime.strptime(publication_date, '%Y-%m-%d').year
             except ValueError:
-                publication_date = None
+                publication_year = None
+        else:
+            publication_year = None
         total_citations = paper_data.get('cited_by_count', 0)
         authorships = paper_data.get('authorships', [])
         journal_data = paper_data.get('host_venue', {})
+        pdf_url = paper_data.get('primary_location', {}).get('pdf_url')
+        influential_citations = paper_data.get('referenced_works_count', 0)
 
         # Create or get Journal
-        journal_id = journal_data.get('id')
-        journal = None
-        if journal_id:
-            journal = session.query(Journal).get(journal_id)
+        journal_id = None
+        journal_name = journal_data.get('display_name')
+        if journal_name:
+            journal = session.query(Journal).filter_by(journal_name=journal_name).first()
             if not journal:
-                journal_name = journal_data.get('display_name')
                 journal = Journal(
-                    journal_id=journal_id,
                     journal_name=journal_name
                 )
                 session.add(journal)
                 session.commit()
+            journal_id = journal.id
+        else:
+            journal = None
 
-        # Check if paper already exists
-        existing_paper = session.query(Paper).get(paper_id)
-        if existing_paper:
-            continue  # Skip if paper already exists
-
-        # Create Paper
+        # Create new Paper
         paper = Paper(
-            paper_id=paper_id,
             title=title,
             abstract=abstract,
-            publication_date=publication_date,
+            publication_year=publication_year,
+            journal_id=journal_id,
             total_citations=total_citations,
-            journal=journal
+            pdf_url=pdf_url,
+            doi=doi,
+            influential_citations=influential_citations
         )
         session.add(paper)
         session.commit()
@@ -90,28 +105,25 @@ def process_papers(papers):
         # Process Authors
         for author_data in authorships:
             author_info = author_data.get('author', {})
-            author_id = author_info.get('id')
-            if author_id:
-                author = session.query(Author).get(author_id)
-                if not author:
-                    author_name = author_info.get('display_name')
-                    author = Author(
-                        author_id=author_id,
-                        name=author_name
-                    )
-                    session.add(author)
-                    session.commit()
-                # Create PaperAuthor association
-                paper_author = session.query(PaperAuthor).filter_by(paper_id=paper_id, author_id=author_id).first()
-                if not paper_author:
-                    affiliation_data = author_data.get('institutions', [])
-                    affiliation = affiliation_data[0]['display_name'] if affiliation_data else None
-                    paper_author = PaperAuthor(
-                        paper_id=paper_id,
-                        author_id=author_id,
-                        affiliation=affiliation
-                    )
-                    session.add(paper_author)
+            author_name = author_info.get('display_name')
+            if not author_name:
+                continue
+            # Check if author already exists
+            author = session.query(Author).filter_by(name=author_name).first()
+            if not author:
+                author = Author(
+                    name=author_name
+                )
+                session.add(author)
+                session.commit()
+            # Create PaperAuthor association
+            paper_author = session.query(PaperAuthor).filter_by(paper_id=paper.id, author_id=author.id).first()
+            if not paper_author:
+                paper_author = PaperAuthor(
+                    paper_id=paper.id,
+                    author_id=author.id
+                )
+                session.add(paper_author)
         session.commit()
 
 def calculate_author_indicators(author):
@@ -119,7 +131,7 @@ def calculate_author_indicators(author):
     base_url = 'https://api.openalex.org/works'
     headers = {'User-Agent': 'AI_Driven_RD (alecklem@tamu.edu)'}
     params = {
-        'filter': f'author.id:{author.author_id}',
+        'filter': f'authorships.author.display_name:"{author.name}"',
         'per-page': 200,
         'cursor': '*'
     }
@@ -127,7 +139,7 @@ def calculate_author_indicators(author):
     while True:
         response = requests.get(base_url, params=params, headers=headers)
         if response.status_code != 200:
-            print(f"Error fetching works for author {author.author_id}: {response.status_code}")
+            print(f"Error fetching works for author {author.name}: {response.status_code}")
             break
         data = response.json()
         works.extend(data['results'])
@@ -152,7 +164,7 @@ def calculate_author_indicators(author):
     author.h_index = h_index
 
     # Calculate author age
-    publication_years = [int(work['publication_year']) for work in works if work.get('publication_year')]
+    publication_years = [int(work.get('publication_year')) for work in works if work.get('publication_year')]
     if publication_years:
         first_publication_year = min(publication_years)
         author.first_publication_year = first_publication_year
@@ -161,6 +173,9 @@ def calculate_author_indicators(author):
     # Calculate total papers
     author.total_papers = len(works)
 
+    # Update total citations
+    author.total_citations = sum(citation_counts)
+
     session.commit()
 
 def calculate_journal_indicators(journal):
@@ -168,7 +183,7 @@ def calculate_journal_indicators(journal):
     base_url = 'https://api.openalex.org/works'
     headers = {'User-Agent': 'AI_Driven_RD (alecklem@tamu.edu)'}
     params = {
-        'filter': f'host_venue.id:{journal.journal_id}',
+        'filter': f'host_venue.display_name:"{journal.journal_name}"',
         'per-page': 200,
         'cursor': '*'
     }
@@ -176,7 +191,7 @@ def calculate_journal_indicators(journal):
     while True:
         response = requests.get(base_url, params=params, headers=headers)
         if response.status_code != 200:
-            print(f"Error fetching works for journal {journal.journal_id}: {response.status_code}")
+            print(f"Error fetching works for journal {journal.journal_name}: {response.status_code}")
             break
         data = response.json()
         works.extend(data['results'])
@@ -213,8 +228,87 @@ def calculate_journal_indicators(journal):
 
     session.commit()
 
+def update_existing_papers():
+    existing_papers = session.query(Paper).all()
+    for paper in existing_papers:
+        # Check for missing fields
+        needs_update = False
+        if not paper.abstract or not paper.publication_year or paper.total_citations is None:
+            needs_update = True
+
+        if needs_update:
+            doi = paper.doi
+            if doi:
+                # Fetch data from OpenAlex using DOI
+                base_url = f'https://api.openalex.org/works/doi:{doi}'
+                headers = {'User-Agent': 'AI_Driven_RD (alecklem@tamu.edu)'}
+                response = requests.get(base_url, headers=headers)
+                if response.status_code != 200:
+                    print(f"Error fetching data for DOI {doi}: {response.status_code}")
+                    continue
+                paper_data = response.json()
+                # Update fields
+                abstract_inverted_index = paper_data.get('abstract_inverted_index')
+                if abstract_inverted_index:
+                    abstract = ' '.join(sorted(abstract_inverted_index, key=abstract_inverted_index.get))
+                    paper.abstract = abstract
+                publication_date = paper_data.get('publication_date')
+                if publication_date:
+                    try:
+                        publication_year = datetime.datetime.strptime(publication_date, '%Y-%m-%d').year
+                        paper.publication_year = publication_year
+                    except ValueError:
+                        pass
+                total_citations = paper_data.get('cited_by_count', 0)
+                paper.total_citations = total_citations
+                influential_citations = paper_data.get('referenced_works_count', 0)
+                paper.influential_citations = influential_citations
+                # Update journal
+                journal_data = paper_data.get('host_venue', {})
+                journal_name = journal_data.get('display_name')
+                if journal_name:
+                    journal = session.query(Journal).filter_by(journal_name=journal_name).first()
+                    if not journal:
+                        journal = Journal(
+                            journal_name=journal_name
+                        )
+                        session.add(journal)
+                        session.commit()
+                    paper.journal_id = journal.id
+                # Update authors
+                authorships = paper_data.get('authorships', [])
+                for author_data in authorships:
+                    author_info = author_data.get('author', {})
+                    author_name = author_info.get('display_name')
+                    if not author_name:
+                        continue
+                    # Check if author already exists
+                    author = session.query(Author).filter_by(name=author_name).first()
+                    if not author:
+                        author = Author(
+                            name=author_name
+                        )
+                        session.add(author)
+                        session.commit()
+                    # Create PaperAuthor association if not exists
+                    paper_author = session.query(PaperAuthor).filter_by(paper_id=paper.id, author_id=author.id).first()
+                    if not paper_author:
+                        paper_author = PaperAuthor(
+                            paper_id=paper.id,
+                            author_id=author.id
+                        )
+                        session.add(paper_author)
+                session.commit()
+            else:
+                print(f"No DOI for paper ID {paper.id}, cannot update")
+    print("Finished updating existing papers")
+
 def main():
-    query = 'machine learning'  # Modify this query to target specific research areas
+    # Update existing papers with missing information
+    update_existing_papers()
+
+    # Fetch and process new papers
+    query = 'machine learning'  # Modify this query as needed
     papers = fetch_papers(query)
     process_papers(papers)
 
