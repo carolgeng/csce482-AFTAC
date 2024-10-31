@@ -4,4 +4,4 @@
 export PYTHONPATH=$(pwd)
 
 #Run pytest with coverage
-pytest --cov=src --cov-report=term-missing
+pytest --cov=src --cov-report=html
