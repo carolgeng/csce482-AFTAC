@@ -39,3 +39,20 @@ for result in results:
     # # Print the most relevant articles
     # for paper in relevant_papers:
     #     print(f"Title: {paper[1]}, Abstract: {paper[2]}")
+
+
+    # src/app.py
+
+def add(a, b):
+    return a + b
+
+def subtract(a, b):
+    return a - b
+
+def multiply(a, b):
+    return a * b
+
+def divide(a, b):
+    if b == 0:
+        raise ValueError("Cannot divide by zero")
+    return a / b
