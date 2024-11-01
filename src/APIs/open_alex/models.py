@@ -1,4 +1,5 @@
 # models.py
+
 from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey, Text, create_engine
 from sqlalchemy.orm import relationship, sessionmaker, declarative_base
 from config import DATABASE_URL
@@ -9,6 +10,7 @@ class Author(Base):
     __tablename__ = 'authors'
 
     id = Column(Integer, primary_key=True)
+    openalex_id = Column(String(50), unique=True)
     name = Column(String(500), nullable=False)
     first_publication_year = Column(Integer)
     author_age = Column(Integer)
@@ -43,7 +45,7 @@ class Paper(Base):
     __tablename__ = 'papers'
 
     id = Column(Integer, primary_key=True)
-    corpus_id = Column(Integer, unique=True)
+    openalex_id = Column(String(50), unique=True)
     title = Column(String(2000), nullable=False)
     abstract = Column(Text)
     publication_year = Column(Integer)
@@ -52,13 +54,13 @@ class Paper(Base):
     citations_per_year = Column(Float)
     rank_citations_per_year = Column(Integer)
     pdf_url = Column(String(1000))
-    doi = Column(String(255))
+    doi = Column(String(255), unique=True)
     influential_citations = Column(Integer)
     delta_citations = Column(Integer)
 
     journal = relationship('Journal', back_populates='papers')
-    authors = relationship('PaperAuthor', back_populates='paper', cascade='all, delete-orphan')
-    
+    authors = relationship('PaperAuthor', back_populates='paper')
+
     # Resolve ambiguity by specifying foreign_keys
     # Incoming citations (papers that cite this paper)
     citations = relationship('Citation', foreign_keys='Citation.paper_id', back_populates='paper')
@@ -67,10 +69,8 @@ class Paper(Base):
 
 class PaperAuthor(Base):
     __tablename__ = 'paper_authors'
-
     paper_id = Column(Integer, ForeignKey('papers.id'), primary_key=True)
     author_id = Column(Integer, ForeignKey('authors.id'), primary_key=True)
-
     paper = relationship('Paper', back_populates='authors')
     author = relationship('Author', back_populates='papers')
 
@@ -88,5 +88,27 @@ class Citation(Base):
     paper = relationship('Paper', foreign_keys=[paper_id], back_populates='citations')
     citing_paper = relationship('Paper', foreign_keys=[citing_paper_id], back_populates='citing_citations')
     author = relationship('Author', back_populates='citations')
+
+# Optional: Define the Concept and PaperConcept models if you wish to store concepts
+class Concept(Base):
+    __tablename__ = 'concepts'
+
+    id = Column(Integer, primary_key=True)
+    openalex_id = Column(String(50), unique=True)
+    name = Column(String(255))
+
+    papers = relationship('PaperConcept', back_populates='concept', cascade='all, delete-orphan')
+
+class PaperConcept(Base):
+    __tablename__ = 'paper_concepts'
+
+    paper_id = Column(Integer, ForeignKey('papers.id'), primary_key=True)
+    concept_id = Column(Integer, ForeignKey('concepts.id'), primary_key=True)
+    score = Column(Float)  # Relevance score
+
+    paper = relationship('Paper', back_populates='concepts')
+    concept = relationship('Concept', back_populates='papers')
+
+Paper.concepts = relationship('PaperConcept', back_populates='paper', cascade='all, delete-orphan')
 
 # No need to create tables since they already exist
