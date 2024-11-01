@@ -1,323 +1,58 @@
-import os
-import re
-import requests
-import wget
-from tqdm import tqdm
-import gzip
-import json
-import logging
-from datetime import datetime
+import src.APIs.arXiv.arXiv_data as arxiv_api
+import scripts.dbscript as script
+import database.arxivdb as arxiv_db
+import src.model.model as dl_model
+from sklearn.feature_extraction.text import TfidfVectorizer
 
-from flask import Flask, jsonify
-from database import db
-from dotenv import load_dotenv
+api_handler = arxiv_api.arxiv_api_handler()
+results = api_handler.query("machine learning", 20)
 
-from flask_migrate import Migrate
+filepath: str = "database/papers.sqlite"
+script.create_database(filepath)
+db_handler = arxiv_db.DBAccess(filepath)
 
-load_dotenv()
-app = Flask(__name__)
 
-# Explicitly set the DATABASE_URL
-database_url = os.environ.get('DATABASE_URL')
+for result in results:
+    # print(result.title +", "+ str(result.published))
+    # print(result.authors)
+    # print(result.pdf_url)
+    # print()
+    db_handler.insert_paper(
+        result.title,
+        result.summary,
+        result.published,
+        result.journal_ref,
+        pdf_url=result.pdf_url,
+        doi=result.doi
+    )
 
-# Ensure proper format of the DATABASE_URL
-if database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db.init_app(app)
-migrate = Migrate(app, db)
+    # # Define the TF-IDF vectorizer and the relevance model
+    # vectorizer = TfidfVectorizer()
+    # model = dl_model.RelevanceModel(input_size=vectorizer.fit_transform(["test"]).shape[1], hidden_size=10)
 
-from models import Paper, Author, paper_authors
+    # # Example usage to get the most relevant articles based on keywords
+    # keywords = "machine learning techniques"
+    # relevant_papers = dl_model.get_most_relevant_articles(keywords, db_handler, model, vectorizer)
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+    # # Print the most relevant articles
+    # for paper in relevant_papers:
+    #     print(f"Title: {paper[1]}, Abstract: {paper[2]}")
 
-API_KEY = os.environ.get("SEMANTIC_SCHOLAR_API_KEY")
-DATASET_NAME = "s2orc"
-LOCAL_PATH = "/Users/alecklem/aftac"
-os.makedirs(LOCAL_PATH, exist_ok=True)
 
-# Initialize counters
-total_papers_processed = 0
-papers_saved = 0
-papers_skipped = 0
+    # src/app.py
 
-def is_relevant_paper(title, abstract):
-    keywords = ['machine learning', 'artificial intelligence', 'deep learning', 'neural network', 'AI', 'ML']
-    content = ''
-    if title:
-        content += title.lower()
-    if abstract:
-        content += ' ' + abstract.lower()
-    return any(keyword in content for keyword in keywords)
+def add(a, b):
+    return a + b
 
-def save_paper_to_db(paper_data):
-    global total_papers_processed, papers_saved, papers_skipped
-    total_papers_processed += 1
+def subtract(a, b):
+    return a - b
 
-    try:
-        logging.info(f"Paper data keys: {paper_data.keys()}")
+def multiply(a, b):
+    return a * b
 
-        content = paper_data.get('content', None)
-        if content:
-            logging.info("'content' is already a dictionary.")
-            logging.info(f"Content keys: {content.keys()}")
-
-            text = content.get('text', "")
-            if not isinstance(text, str):
-                logging.error(f"Unexpected type for text: {type(text)}")
-                text = ""
-            annotations = content.get('annotations', {})
-
-            logging.info(f"Annotations type: {type(annotations)}")
-            logging.info(f"Annotations keys: {list(annotations.keys())}")
-
-            title = None
-            abstract = None
-            year = None
-
-            # Initialize title_annotations and abstract_annotations
-            title_annotations = []
-            abstract_annotations = []
-
-            # Process title
-            title_annotations_data = annotations.get('title')
-            if title_annotations_data:
-                if isinstance(title_annotations_data, str):
-                    try:
-                        title_annotations = json.loads(title_annotations_data)
-                    except json.JSONDecodeError as e:
-                        logging.error(f"Error parsing title annotations: {e}")
-                elif isinstance(title_annotations_data, list):
-                    title_annotations = title_annotations_data
-                else:
-                    logging.error(f"Unexpected type for title annotations: {type(title_annotations_data)}")
-
-                if title_annotations:
-                    ann = title_annotations[0]
-                    start = ann.get('start')
-                    end = ann.get('end')
-                    try:
-                        start = int(start)
-                        end = int(end)
-                        title = text[start:end].strip()
-                    except (ValueError, TypeError) as e:
-                        logging.error(f"Invalid indices in title annotation: {ann} | Error: {e}")
-
-            # Process abstract
-            abstract_annotations_data = annotations.get('abstract')
-            if abstract_annotations_data:
-                if isinstance(abstract_annotations_data, str):
-                    try:
-                        abstract_annotations = json.loads(abstract_annotations_data)
-                    except json.JSONDecodeError as e:
-                        logging.error(f"Error parsing abstract annotations: {e}")
-                elif isinstance(abstract_annotations_data, list):
-                    abstract_annotations = abstract_annotations_data
-                else:
-                    logging.error(f"Unexpected type for abstract annotations: {type(abstract_annotations_data)}")
-
-                if abstract_annotations:
-                    ann = abstract_annotations[0]
-                    start = ann.get('start')
-                    end = ann.get('end')
-                    try:
-                        start = int(start)
-                        end = int(end)
-                        abstract = text[start:end].strip()
-                        # Truncate if necessary
-                        max_abstract_length = 1000
-                        if len(abstract) > max_abstract_length:
-                            logging.warning(f"Abstract for paper '{title}' is unusually long. Truncating.")
-                            abstract = abstract[:max_abstract_length] + '...'
-                    except (ValueError, TypeError) as e:
-                        logging.error(f"Invalid indices in abstract annotation: {ann} | Error: {e}")
-
-            # Extract publication year
-            year = extract_publication_year(text, annotations)
-
-            # Check if paper is relevant
-            if not is_relevant_paper(title, abstract):
-                logging.info(f"Paper '{title}' is not relevant to ML/AI. Skipping.")
-                papers_skipped += 1
-                return
-
-            # Process authors
-            authors_list = []
-            author_annotations_data = annotations.get('author')
-            if author_annotations_data:
-                if isinstance(author_annotations_data, str):
-                    try:
-                        author_annotations = json.loads(author_annotations_data)
-                    except json.JSONDecodeError as e:
-                        logging.error(f"Error parsing author annotations: {e}")
-                        author_annotations = []
-                elif isinstance(author_annotations_data, list):
-                    author_annotations = author_annotations_data
-                else:
-                    logging.error(f"Unexpected type for author annotations: {type(author_annotations_data)}")
-                    author_annotations = []
-
-                for ann in author_annotations:
-                    start = ann.get('start')
-                    end = ann.get('end')
-                    try:
-                        start = int(start)
-                        end = int(end)
-                        author_name = text[start:end].strip()
-                        if author_name:
-                            authors_list.append(author_name)
-                    except (ValueError, TypeError) as e:
-                        logging.error(f"Invalid indices in author annotation: {ann} | Error: {e}")
-
-            # Save the paper
-            existing_paper = Paper.query.filter_by(title=title).first()
-            if not existing_paper:
-                new_paper = Paper(
-                    title=title,
-                    abstract=abstract,
-                    publication_year=year,
-                    raw_content=text  # Store raw text
-                    # Add other fields as necessary
-                )
-                db.session.add(new_paper)
-                db.session.commit()
-                papers_saved += 1
-
-                # Save authors
-                for author_name in authors_list:
-                    existing_author = Author.query.filter_by(name=author_name).first()
-                    if not existing_author:
-                        new_author = Author(name=author_name)
-                        db.session.add(new_author)
-                        db.session.commit()
-                    else:
-                        new_author = existing_author
-                    new_paper.authors.append(new_author)
-                db.session.commit()
-            else:
-                logging.info(f"Paper '{title}' already exists.")
-                papers_skipped += 1
-
-            # Log counts every 100 papers
-            if total_papers_processed % 100 == 0:
-                logging.info(f"Processed: {total_papers_processed}, Saved: {papers_saved}, Skipped: {papers_skipped}")
-        else:
-            logging.error("'content' is missing or None.")
-            papers_skipped += 1
-    except Exception as e:
-        logging.error(f"Error saving paper: {e}")
-        db.session.rollback()
-        papers_skipped += 1
-
-def extract_publication_year(text, annotations):
-    year = None
-    current_year = datetime.now().year
-    year_pattern = re.compile(r'\b(19|20)\d{2}\b')
-
-    # Attempt to extract year from 'source' field
-    source = annotations.get('source', '')
-    if isinstance(source, str):
-        match = year_pattern.search(source)
-        if match:
-            year_candidate = int(match.group())
-            if 1900 <= year_candidate <= current_year:
-                year = year_candidate
-                logging.info(f"Extracted year from source: {year}")
-    elif isinstance(source, dict):
-        source_str = json.dumps(source)
-        match = year_pattern.search(source_str)
-        if match:
-            year_candidate = int(match.group())
-            if 1900 <= year_candidate <= current_year:
-                year = year_candidate
-                logging.info(f"Extracted year from source dict: {year}")
-
-    # If year not found, attempt to extract from 'bibentry'
-    if not year:
-        bibentry_annotations_data = annotations.get('bibentry')
-        bib_years = []
-        if bibentry_annotations_data:
-            if isinstance(bibentry_annotations_data, str):
-                try:
-                    bibentry_annotations = json.loads(bibentry_annotations_data)
-                except json.JSONDecodeError as e:
-                    logging.error(f"Error parsing bibentry annotations: {e}")
-                    bibentry_annotations = []
-            elif isinstance(bibentry_annotations_data, list):
-                bibentry_annotations = bibentry_annotations_data
-            else:
-                logging.error(f"Unexpected type for bibentry annotations: {type(bibentry_annotations_data)}")
-                bibentry_annotations = []
-
-            for bib_entry in bibentry_annotations:
-                start = bib_entry.get('start')
-                end = bib_entry.get('end')
-                try:
-                    start = int(start)
-                    end = int(end)
-                    bib_text = text[start:end].strip()
-                    # Search for all years in bib_text
-                    matches = year_pattern.findall(bib_text)
-                    for match in matches:
-                        year_candidate = int(match)
-                        if 1900 <= year_candidate <= current_year:
-                            bib_years.append(year_candidate)
-                except (ValueError, TypeError) as e:
-                    logging.error(f"Invalid indices in bibentry annotation: {bib_entry} | Error: {e}")
-
-            if bib_years:
-                year = max(bib_years)
-                logging.info(f"Estimated publication year from bibentry: {year}")
-            else:
-                logging.warning("No valid years found in bibentry annotations.")
-        else:
-            logging.warning("Bibentry annotations are missing or None.")
-
-    return year
-
-def download_s2orc_dataset():
-    response = requests.get("https://api.semanticscholar.org/datasets/v1/release/latest").json()
-    RELEASE_ID = response["release_id"]
-    logging.info(f"Latest release ID: {RELEASE_ID}")
-
-    response = requests.get(
-        f"https://api.semanticscholar.org/datasets/v1/release/{RELEASE_ID}/dataset/{DATASET_NAME}/", 
-        headers={"x-api-key": API_KEY}
-    ).json()
-
-    for url in tqdm(response["files"]):
-        match = re.match(r"https://ai2-s2ag.s3.amazonaws.com/staging/(.*)/s2orc/(.*).gz(.*)", url)
-        SHARD_ID = match.group(2)
-        file_path = os.path.join(LOCAL_PATH, f"{SHARD_ID}.gz")
-        
-        if not os.path.exists(file_path):
-            logging.info(f"Downloading {SHARD_ID}...")
-            wget.download(url, out=file_path)
-        else:
-            logging.info(f"File {file_path} already exists. Skipping download.")
-
-        # Process the downloaded file
-        logging.info(f"Processing file {file_path}...")
-        with gzip.open(file_path, 'rb') as f_in:
-            for line in f_in:
-                paper_data = json.loads(line)
-                save_paper_to_db(paper_data)
-
-    logging.info(f"Downloaded and processed shard {SHARD_ID}")
-
-    # Log final counts
-    logging.info(f"Total papers processed: {total_papers_processed}")
-    logging.info(f"Papers saved: {papers_saved}")
-    logging.info(f"Papers skipped: {papers_skipped}")
-
-@app.route('/download-s2orc')
-def download_and_store_s2orc():
-    download_s2orc_dataset()
-    return jsonify({"message": "S2ORC dataset download and storage process started!"})
-
-if __name__ == '__main__':
-    app.run(debug=False, port=5001)
+def divide(a, b):
+    if b == 0:
+        raise ValueError("Cannot divide by zero")
+    return a / b
