@@ -3,3 +3,7 @@ arxiv
 
 #GUI
 reflex
+
+#testing
+pytest
+pytest-cov
