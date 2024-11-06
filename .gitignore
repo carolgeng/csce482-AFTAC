@@ -6,6 +6,7 @@
 venv/
 
 *.sqlite
+*.db
 .env
 .coverage
 *.pyc
