@@ -15,6 +15,11 @@ This application is the Fall 2024 capstone project of:
      ```bash
      source venv/bin/activate
      ```
+   - when you're done with the venv, you can just enter the following in the command line
+    ```bash
+    deactivate
+    ```
+     - 
 
 2. **Database Setup**:  
    Run the `db_reset.sh` script to create the SQLite database (used tentatively).  
@@ -28,3 +33,8 @@ This application is the Fall 2024 capstone project of:
 
    ```bash
    ./run_tests.sh
+
+4. **To actually run the app, cd into the app directory and run the following commands:**
+    - reflex init
+    - reflex run
+    - if you do any of the commands outside of the app directory, it will create a reflex app outside of the reflex app so please be sure you cd into the app directory first and don't forget to cd out when you're done
