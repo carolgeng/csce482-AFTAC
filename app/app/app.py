@@ -1,4 +1,5 @@
 import reflex as rx
+from datetime import datetime
 from rxconfig import config
 from APIs.arXiv.arXiv_wrapper import api_handler
 
@@ -7,6 +8,9 @@ class Article(rx.Base):
     authors: str
     summary: str
     pdf_url: str
+    published: str
+    comment: str = ""
+    journal_ref: str = ""
 
 class State(rx.State):
     """The app state."""
@@ -17,6 +21,14 @@ class State(rx.State):
     # Store the search results as a list of Article models
     results: list[Article] = []
 
+    def set_keywords(self, value):
+        """Set the search keywords."""
+        self.keywords = value
+
+    def set_num_articles(self, value):
+        """Set the number of articles."""
+        self.num_articles = value
+
     def search_articles(self):
         """Function to handle article search."""
         handler = api_handler()
@@ -25,22 +37,30 @@ class State(rx.State):
             num_articles_int = int(self.num_articles)
         except ValueError:
             num_articles_int = 10  # Default or handle error
+
         # Get the generator of results
         results_generator = handler.query(self.keywords, num_articles_int)
-        # Extract relevant information from the results
-        self.results = [
-            Article(
+
+        # Initialize an empty list to store articles
+        self.results = []
+        for result in results_generator:
+            # Convert published to string
+            published_str = result.published.strftime('%Y-%m-%d %H:%M:%S') if result.published else ''
+
+            # Ensure journal_ref is a string
+            journal_ref = getattr(result, 'journal_ref', '') or ''
+
+            # Create Article instance
+            article = Article(
                 title=result.title,
                 authors=', '.join([author.name for author in result.authors]),
                 summary=result.summary,
                 pdf_url=result.pdf_url,
+                published=published_str,
+                comment=(getattr(result, 'comment', '') or ''),
+                journal_ref=journal_ref,
             )
-            for result in results_generator
-        ]
-
-    def set_num_articles(self, value):
-        """Set the number of articles."""
-        self.num_articles = value
+            self.results.append(article)
 
     def clear_results(self):
         """Clear the search results and reset input fields."""
@@ -50,10 +70,14 @@ class State(rx.State):
 
 def index() -> rx.Component:
     return rx.container(
+        # Use the standard button to toggle color mode
         rx.color_mode.button(position="top-right"),
         rx.vstack(
-            rx.heading("AFTAC: AI Driven R&D", size="9"),
-            rx.text("Enter keywords to find relevant articles.", size="5"),
+            rx.heading("AFTAC: AI Driven R&D", size="2xl"),
+            rx.text(
+                "Enter keywords to find relevant articles.",
+                font_size="lg"
+            ),
             # Input field for keywords
             rx.input(
                 placeholder="Enter keywords...",
@@ -92,7 +116,42 @@ def index() -> rx.Component:
                     State.results,
                     lambda result: rx.box(
                         rx.heading(result.title, size="md"),
-                        rx.text("Authors: " + result.authors),
+                        rx.hstack(
+                            rx.text("Authors: ", font_weight="bold"),
+                            rx.text(result.authors),
+                            spacing="0px",
+                        ),
+                        rx.hstack(
+                            rx.text("Published: ", font_weight="bold"),
+                            rx.text(result.published),
+                            spacing="0px",
+                        ),
+                        rx.cond(
+                            result.comment != "",
+                            rx.hstack(
+                                rx.text("Comments: ", font_weight="bold"),
+                                rx.text(result.comment),
+                                spacing="0px",
+                            ),
+                            rx.hstack(
+                                rx.text("Comments: ", font_weight="bold"),
+                                rx.text("No comments"),
+                                spacing="0px",
+                            )
+                        ),
+                        rx.cond(
+                            result.journal_ref != "",
+                            rx.hstack(
+                                rx.text("Journal Reference: ", font_weight="bold"),
+                                rx.text(result.journal_ref),
+                                spacing="0px",
+                            ),
+                            rx.hstack(
+                                rx.text("Journal Reference: ", font_weight="bold"),
+                                rx.text("No journal reference"),
+                                spacing="0px",
+                            )
+                        ),
                         rx.text(result.summary),
                         rx.link(
                             "Download PDF",
