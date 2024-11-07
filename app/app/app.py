@@ -1,7 +1,28 @@
+# for oauth
+import functools
+import json
+import os
+import time
+from google.auth.transport import requests
+from google.oauth2.id_token import verify_oauth2_token
+from .react_oauth_google import (
+    GoogleOAuthProvider,
+    GoogleLogin,
+)
+from dotenv import load_dotenv
+
+# for article serach app
 import reflex as rx
 from rxconfig import config
 from APIs.arXiv.arXiv_wrapper import api_handler
 
+import reflex as rx
+
+# gets client id from env file
+load_dotenv()
+CLIENT_ID = os.getenv('CLIENT_ID')
+
+# structure that holds the contents of the search results 
 class Article(rx.Base):
     title: str
     authors: str
@@ -9,13 +30,59 @@ class Article(rx.Base):
     pdf_url: str
 
 class State(rx.State):
-    """The app state."""
-    # Store the user's input keywords
+
+    """State for managing user data and article search."""
+    # store the user's input keywords
     keywords: str = ""
-    # Store the user's desired number of articles as a string
+    # store the user's desired number of articles as a string
     num_articles: str = "10"  # Default value
-    # Store the search results as a list of Article models
+    # store the search results as a list of Article models
     results: list[Article] = []
+
+    # for oauth use token instead of goole client secret
+    id_token_json: str = rx.LocalStorage()
+
+    def on_success(self, id_token: dict):
+        """Handle successful login and store the ID token."""
+        self.id_token_json = json.dumps(id_token)
+
+    @rx.var(cache=True)
+    def tokeninfo(self) -> dict[str, str]:
+        """Verify and parse the user's ID token."""
+        try:
+            return verify_oauth2_token(
+                json.loads(self.id_token_json)[
+                    "credential"
+                ],
+                requests.Request(),
+                CLIENT_ID,
+            )
+        except Exception as exc:
+            if self.id_token_json:
+                print(f"Error verifying token: {exc}")
+        return {}
+
+    def logout(self):
+        """Log the user out by clearing the ID token."""
+        self.id_token_json = ""
+
+    @rx.var
+    def token_is_valid(self) -> bool:
+        """Check if the user's token is valid."""
+        try:
+            return bool(
+                self.tokeninfo
+                and int(self.tokeninfo.get("exp", 0))
+                > time.time()
+            )
+        except Exception:
+            return False
+
+    # @rx.var(cache=True)
+    # def protected_content(self) -> str:
+    #     if self.token_is_valid:
+    #         return f"This content can only be viewed by a logged in User. Nice to see you {self.tokeninfo['name']}"
+    #     return "Not logged in."
 
     def search_articles(self):
         """Function to handle article search."""
@@ -37,7 +104,6 @@ class State(rx.State):
             )
             for result in results_generator
         ]
-
     def set_num_articles(self, value):
         """Set the number of articles."""
         self.num_articles = value
@@ -48,10 +114,64 @@ class State(rx.State):
         self.keywords = ""
         self.num_articles = "10"
 
-def index() -> rx.Component:
+def user_info(tokeninfo: dict) -> rx.Component:
+    """Display the user's information, including avatar and email."""
+    return rx.hstack(
+        rx.avatar(
+            name=tokeninfo["name"],
+            src=tokeninfo["picture"],
+            size="md",
+        ),
+        rx.vstack(
+            rx.heading(tokeninfo["name"], size="md"),
+            rx.text(tokeninfo["email"]),
+            align_items="flex-start",
+        ),
+        rx.button("Logout", on_click=State.logout),
+        padding="10px",
+    )
+
+
+def login() -> rx.Component:
+    """Display the Google Login button."""
+    return rx.vstack(
+        GoogleLogin.create(on_success=State.on_success),
+    )
+
+
+def require_google_login(page) -> rx.Component:
+    """Ensure that the user is logged in before accessing the page."""
+    @functools.wraps(page)
+    def _auth_wrapper() -> rx.Component:
+        return GoogleOAuthProvider.create(
+            rx.cond(
+                State.is_hydrated,
+                rx.cond(
+                    State.token_is_valid, page(), login()
+                ),
+                rx.spinner(),
+            ),
+            client_id=CLIENT_ID,
+        )
+
+    return _auth_wrapper
+
+
+# def index():
+#     return rx.vstack(
+#         rx.heading("Google OAuth", size="lg"),
+#         rx.link("Protected Page", href="/protected"),
+#     )
+
+
+@rx.page(route="/")
+@require_google_login
+def protected() -> rx.Component:
+    """The protected page where users can search for articles."""
     return rx.container(
         rx.color_mode.button(position="top-right"),
         rx.vstack(
+            user_info(State.tokeninfo),
             rx.heading("AFTAC: AI Driven R&D", size="9"),
             rx.text("Enter keywords to find relevant articles.", size="5"),
             # Input field for keywords
@@ -116,6 +236,13 @@ def index() -> rx.Component:
             min_height="85vh",
         ),
     )
+    # return rx.vstack(
+    #     user_info(State.tokeninfo),
+    #     # rx.text(State.protected_content),
+    #     # rx.link("Home", href="/"),
+    # )
+
+
 
 app = rx.App()
-app.add_page(index)
+
