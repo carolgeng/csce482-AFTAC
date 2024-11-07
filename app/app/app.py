@@ -133,9 +133,6 @@ class State(rx.State):
                 published=published_str,
                 comment=(getattr(result, 'comment', '') or ''),
                 journal_ref=journal_ref,
-                published=published_str,
-                comment=(getattr(result, 'comment', '') or ''),
-                journal_ref=journal_ref,
             )
             self.results.append(article)
             self.results.append(article)
