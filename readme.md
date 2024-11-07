@@ -8,6 +8,8 @@ This application is the Fall 2024 capstone project of:
 
 ## How to Set Up
 
+**We are using python 3.12.3**
+
 1. **Clone the Repository**:  
    After cloning, run the `setup_venv.sh` script:
    - This will create a virtual environment, install pip, and install all dependencies from `requirements.txt`.
@@ -19,7 +21,6 @@ This application is the Fall 2024 capstone project of:
     ```bash
     deactivate
     ```
-     - 
 
 2. **Database Setup**:  
    Run the `db_reset.sh` script to create the SQLite database (used tentatively).  

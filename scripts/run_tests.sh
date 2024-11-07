@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Change to the root directory
+cd "$(dirname "$0")"/..
+
 # Set PYTHONPATH to the project root
 echo "Setting PYTHONPATH..."
 export PYTHONPATH="$(pwd)"

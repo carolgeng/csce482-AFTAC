@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Change to the root directory
+cd "$(dirname "$0")"/..
+
 # Check if requirements.txt exists
 if [ ! -f requirements.txt ]; then
     echo "requirements.txt not found in the current directory."
