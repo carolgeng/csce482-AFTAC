@@ -9,7 +9,8 @@ class api_handler:
     def query(self, query, max_results=None):
         search = arxiv.Search(
             query=query,
-            sort_by=arxiv.SortCriterion.Relevance
+            sort_by=arxiv.SortCriterion.Relevance,
+            sort_order=arxiv.SortOrder.Descending
         )
         # Generator function to yield results with a DOI
         def results_with_doi():
