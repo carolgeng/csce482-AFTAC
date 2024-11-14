@@ -14,67 +14,54 @@ def main():
     query = input('Enter the query string to search arXiv: ')
 
     # Initialize the database manager and API handler
-    print("Initializing database manager and API handler...")
     manager = DatabaseManager("data.db")
     handler = api_handler()
 
-    # Use the query passed from the command line
-    print(f"Querying arXiv with: {query}")
-    results = list(handler.query(query, None))
+    # Start querying
+    print(f"Querying arXiv for: {query}...")
+    results_generator = handler.query(query, None)
 
-    if not results:
-        print("No results found for the given query.")
-        return
+    processed_count = 0
+    inserted_papers = 0
 
-    print(f"Found {len(results)} results. Processing them...")
-    for idx, result in enumerate(results, start=1):
-        print(f"Processing result {idx}/{len(results)}: {result.title}")
-        
+    # Process results iteratively
+    for result in results_generator:
+        processed_count += 1
+
         # Extract arXiv ID from result.entry_id
         arxiv_id_full = result.entry_id.split('/')[-1] if hasattr(result, 'entry_id') else None
         # Optionally remove version number from arXiv ID
         arxiv_id = arxiv_id_full.split('v')[0] if arxiv_id_full else None
 
-        # Get or create journal
-        journal_name = getattr(result, 'journal_ref', None)
-        if journal_name:
-            print(f"Getting or creating journal: {journal_name}")
-            journal_id = manager.get_or_create_journal(
-                journal_name=journal_name,
-                mean_citations_per_paper=0.0,
-                delta_mean_citations_per_paper=None,
-                journal_h_index=0,
-                delta_journal_h_index=None,
-                max_citations_paper=None,
-                total_papers_published=0,
-                delta_total_papers_published=None
+        # Check if a paper with the same DOI already exists
+        existing_paper = manager.get_paper_by_doi(result.doi)
+
+        if not existing_paper:
+            # Insert the paper into the database
+            inserted_papers += 1
+            print(f"Inserting paper {inserted_papers}: {result.title}")
+            paper_id = manager.insert_paper(
+                corpus_id=None,  # Replace with an actual corpus_id if available
+                title=result.title,
+                abstract=result.summary,
+                publication_year=result.published.year if hasattr(result, 'published') and result.published else None,
+                journal_id=None,  # Journal data insertion is optional for now
+                total_citations=0,
+                influential_citations=0,
+                delta_citations=0,
+                citations_per_year=0.0,
+                rank_citations_per_year=None,
+                pdf_url=result.pdf_url if hasattr(result, 'pdf_url') else None,
+                doi=result.doi if hasattr(result, 'doi') else None
             )
         else:
-            journal_id = None  # Handle cases where journal_ref is None
-            print("No journal reference found for this paper.")
+            # Use the existing paper ID if found
+            paper_id = existing_paper['id']
 
-        # Insert paper and get paper_id
-        print(f"Inserting paper: {result.title}")
-        paper_id = manager.insert_paper(
-            corpus_id=None,  # Replace with actual corpus_id if available
-            title=result.title,
-            abstract=result.summary,
-            publication_year=result.published.year if hasattr(result, 'published') and result.published else None,
-            journal_id=journal_id,
-            total_citations=0,
-            influential_citations=0,
-            delta_citations=0,
-            citations_per_year=0.0,
-            rank_citations_per_year=None,
-            pdf_url=result.pdf_url if hasattr(result, 'pdf_url') else None,
-            doi=result.doi if hasattr(result, 'doi') else None
-        )
-
-        # Process authors
-        if hasattr(result, 'authors'):
+        # Process authors (insert or get existing authors and paper_authors associations)
+        if hasattr(result, 'authors') and result.authors is not None:
             for author in result.authors:
                 author_name = author.name if hasattr(author, 'name') else str(author)
-                print(f"Getting or creating author: {author_name}")
                 author_id = manager.get_or_create_author(
                     name=author_name,
                     first_publication_year=None,
@@ -89,17 +76,20 @@ def main():
                     total_citations=0
                 )
 
-                # Insert into paper_authors association table
-                print(f"Inserting association between paper ID {paper_id} and author ID {author_id}")
-                manager.insert_paper_author(
+                # Insert into paper_authors association table using insert_or_ignore_paper_author
+                manager.insert_or_ignore_paper_author(
                     paper_id=paper_id,
                     author_id=author_id
                 )
 
+    # Print summary
+    if processed_count == 0:
+        print("No results found for the given query.")
+    else:
+        print(f"Processed {processed_count} results from arXiv. Inserted {inserted_papers} new papers into the database.")
+
     # Close the database connection
-    print("Closing database connection...")
     manager.close_connection()
-    print("Script completed successfully.")
 
 if __name__ == '__main__':
     main()
