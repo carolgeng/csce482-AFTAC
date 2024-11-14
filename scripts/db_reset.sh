@@ -8,11 +8,11 @@ rm -f data.db
 
 # Create a new SQLite database and execute the schema
 sqlite3 data.db <<EOF
--- Drop tables if they exist to ensure a clean reset
+-- Drop existing tables to ensure a clean reset
+DROP TABLE IF EXISTS paper_concepts;
+DROP TABLE IF EXISTS concepts;
 DROP TABLE IF EXISTS citations;
 DROP TABLE IF EXISTS paper_authors;
-DROP TABLE IF EXISTS paper_figures;
-DROP TABLE IF EXISTS paper_external_ids;
 DROP TABLE IF EXISTS papers;
 DROP TABLE IF EXISTS authors;
 DROP TABLE IF EXISTS journals;
@@ -20,47 +20,52 @@ DROP TABLE IF EXISTS journals;
 -- Create the 'authors' table
 CREATE TABLE authors (
     id INTEGER PRIMARY KEY,
+    openalex_id VARCHAR(50) UNIQUE,
     name VARCHAR(500) NOT NULL,
     first_publication_year INTEGER,
     author_age INTEGER,
-    h_index INTEGER DEFAULT 0,
+    h_index INTEGER,
     delta_h_index INTEGER,
-    adopters INTEGER DEFAULT 0,
-    total_papers INTEGER DEFAULT 0,
+    adopters INTEGER,
+    total_papers INTEGER,
     delta_total_papers INTEGER,
     recent_coauthors INTEGER,
-    coauthor_pagerank FLOAT DEFAULT 0.0,
-    total_citations INTEGER DEFAULT 0
+    coauthor_pagerank FLOAT,
+    total_citations INTEGER,
+    citations_per_paper FLOAT,
+    max_citations INTEGER,
+    total_journals INTEGER,
+    mean_journal_citations_per_paper FLOAT
 );
 
 -- Create the 'journals' table
 CREATE TABLE journals (
     id INTEGER PRIMARY KEY,
     journal_name VARCHAR(255) NOT NULL,
-    mean_citations_per_paper FLOAT DEFAULT 0.0,
+    mean_citations_per_paper FLOAT,
     delta_mean_citations_per_paper FLOAT,
-    journal_h_index INTEGER DEFAULT 0,
+    journal_h_index INTEGER,
     delta_journal_h_index INTEGER,
     max_citations_paper INTEGER,
-    total_papers_published INTEGER DEFAULT 0,
+    total_papers_published INTEGER,
     delta_total_papers_published INTEGER
 );
 
 -- Create the 'papers' table
 CREATE TABLE papers (
     id INTEGER PRIMARY KEY,
-    corpus_id INTEGER UNIQUE,
+    openalex_id VARCHAR(50) UNIQUE,
     title VARCHAR(2000) NOT NULL,
     abstract TEXT,
     publication_year INTEGER,
     journal_id INTEGER,
-    total_citations INTEGER DEFAULT 0,
-    influential_citations INTEGER DEFAULT 0,
-    delta_citations INTEGER DEFAULT 0,
-    citations_per_year FLOAT DEFAULT 0.0,
+    total_citations INTEGER,
+    citations_per_year FLOAT,
     rank_citations_per_year INTEGER,
     pdf_url VARCHAR(1000),
-    doi VARCHAR(255),
+    doi VARCHAR(255) UNIQUE,
+    influential_citations INTEGER,
+    delta_citations INTEGER,
     FOREIGN KEY(journal_id) REFERENCES journals(id)
 );
 
@@ -73,37 +78,34 @@ CREATE TABLE paper_authors (
     FOREIGN KEY(author_id) REFERENCES authors(id)
 );
 
--- Create the 'paper_external_ids' table
-CREATE TABLE paper_external_ids (
-    id INTEGER PRIMARY KEY,
-    paper_id INTEGER NOT NULL,
-    arxiv_id VARCHAR(255),
-    doi VARCHAR(255),
-    pubmed_id VARCHAR(255),
-    dblp_id VARCHAR(255),
-    FOREIGN KEY(paper_id) REFERENCES papers(id)
-);
-
--- Create the 'paper_figures' table
-CREATE TABLE paper_figures (
-    id INTEGER PRIMARY KEY,
-    paper_id INTEGER NOT NULL,
-    figure_id VARCHAR(255),
-    caption TEXT,
-    FOREIGN KEY(paper_id) REFERENCES papers(id)
-);
-
 -- Create the 'citations' table
 CREATE TABLE citations (
     id INTEGER PRIMARY KEY,
     paper_id INTEGER,
     author_id INTEGER,
     citation_year INTEGER,
-    citation_count INTEGER DEFAULT 0,
+    citation_count INTEGER,
     citing_paper_id INTEGER,
     FOREIGN KEY(paper_id) REFERENCES papers(id),
     FOREIGN KEY(author_id) REFERENCES authors(id),
     FOREIGN KEY(citing_paper_id) REFERENCES papers(id)
+);
+
+-- Create the 'concepts' table
+CREATE TABLE concepts (
+    id INTEGER PRIMARY KEY,
+    openalex_id VARCHAR(50) UNIQUE,
+    name VARCHAR(255)
+);
+
+-- Create the 'paper_concepts' association table
+CREATE TABLE paper_concepts (
+    paper_id INTEGER NOT NULL,
+    concept_id INTEGER NOT NULL,
+    score FLOAT,
+    PRIMARY KEY (paper_id, concept_id),
+    FOREIGN KEY(paper_id) REFERENCES papers(id),
+    FOREIGN KEY(concept_id) REFERENCES concepts(id)
 );
 EOF
 

@@ -1,10 +1,5 @@
 import sys
 import os
-import argparse
-import logging
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
 # Add the project root to sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -15,30 +10,26 @@ from app.database.DatabaseManager import DatabaseManager
 from app.APIs.arXiv.arXiv_wrapper import api_handler
 
 def main():
-    # Set up argument parsing
-    parser = argparse.ArgumentParser(description='Fetch papers from arXiv and store them in the database.')
-    parser.add_argument('query', type=str, help='The query string to search arXiv.')
-    args = parser.parse_args()
-
-    logging.info(f"Starting script with query: {args.query}")
+    # Prompt the user for the query keyword
+    query = input('Enter the query string to search arXiv: ')
 
     # Initialize the database manager and API handler
+    print("Initializing database manager and API handler...")
     manager = DatabaseManager("data.db")
     handler = api_handler()
 
     # Use the query passed from the command line
-    logging.info("Querying the arXiv API...")
-    results = list(handler.query(args.query, None))
+    print(f"Querying arXiv with: {query}")
+    results = list(handler.query(query, None))
 
     if not results:
-        logging.info("No results found for the query.")
+        print("No results found for the given query.")
         return
 
-    logging.info(f"Found {len(results)} results. Processing them...")
-
+    print(f"Found {len(results)} results. Processing them...")
     for idx, result in enumerate(results, start=1):
-        logging.info(f"Processing result {idx}/{len(results)}: {result.title}")
-
+        print(f"Processing result {idx}/{len(results)}: {result.title}")
+        
         # Extract arXiv ID from result.entry_id
         arxiv_id_full = result.entry_id.split('/')[-1] if hasattr(result, 'entry_id') else None
         # Optionally remove version number from arXiv ID
@@ -47,18 +38,23 @@ def main():
         # Get or create journal
         journal_name = getattr(result, 'journal_ref', None)
         if journal_name:
+            print(f"Getting or creating journal: {journal_name}")
             journal_id = manager.get_or_create_journal(
                 journal_name=journal_name,
                 mean_citations_per_paper=0.0,
+                delta_mean_citations_per_paper=None,
                 journal_h_index=0,
-                total_papers_published=0
+                delta_journal_h_index=None,
+                max_citations_paper=None,
+                total_papers_published=0,
+                delta_total_papers_published=None
             )
-            logging.info(f"Journal '{journal_name}' inserted/exists with ID {journal_id}.")
         else:
             journal_id = None  # Handle cases where journal_ref is None
-            logging.info("No journal reference found for this paper.")
+            print("No journal reference found for this paper.")
 
         # Insert paper and get paper_id
+        print(f"Inserting paper: {result.title}")
         paper_id = manager.insert_paper(
             corpus_id=None,  # Replace with actual corpus_id if available
             title=result.title,
@@ -73,43 +69,37 @@ def main():
             pdf_url=result.pdf_url if hasattr(result, 'pdf_url') else None,
             doi=result.doi if hasattr(result, 'doi') else None
         )
-        logging.info(f"Paper '{result.title}' inserted with ID {paper_id}.")
-
-        # Insert paper external IDs
-        manager.insert_paper_external_id(
-            paper_id=paper_id,
-            arxiv_id=arxiv_id,
-            doi=result.doi
-        )
-        logging.info(f"Paper external IDs inserted for paper ID {paper_id}.")
 
         # Process authors
         if hasattr(result, 'authors'):
             for author in result.authors:
-                # Get or create author
                 author_name = author.name if hasattr(author, 'name') else str(author)
+                print(f"Getting or creating author: {author_name}")
                 author_id = manager.get_or_create_author(
                     name=author_name,
+                    first_publication_year=None,
+                    author_age=None,
                     h_index=0,
+                    delta_h_index=None,
                     adopters=0,
                     total_papers=0,
+                    delta_total_papers=None,
+                    recent_coauthors=None,
                     coauthor_pagerank=0.0,
                     total_citations=0
                 )
-                logging.info(f"Author '{author_name}' inserted/exists with ID {author_id}.")
 
                 # Insert into paper_authors association table
+                print(f"Inserting association between paper ID {paper_id} and author ID {author_id}")
                 manager.insert_paper_author(
                     paper_id=paper_id,
                     author_id=author_id
                 )
-                logging.info(f"Association between paper ID {paper_id} and author ID {author_id} inserted.")
-        else:
-            logging.info("No authors found for this paper.")
 
     # Close the database connection
+    print("Closing database connection...")
     manager.close_connection()
-    logging.info("Script completed successfully.")
+    print("Script completed successfully.")
 
 if __name__ == '__main__':
     main()

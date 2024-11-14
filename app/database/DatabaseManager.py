@@ -39,12 +39,12 @@ class DatabaseManager:
                      total_citations=0, influential_citations=0, delta_citations=0, citations_per_year=0.0,
                      rank_citations_per_year=None, pdf_url=None, doi=None):
         sql = '''
-        INSERT INTO papers (corpus_id, title, abstract, publication_year, journal_id, total_citations,
+        INSERT INTO papers (title, abstract, publication_year, journal_id, total_citations,
                             influential_citations, delta_citations, citations_per_year,
                             rank_citations_per_year, pdf_url, doi)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         '''
-        values = (corpus_id, title, abstract, publication_year, journal_id, total_citations,
+        values = (title, abstract, publication_year, journal_id, total_citations,
                   influential_citations, delta_citations, citations_per_year,
                   rank_citations_per_year, pdf_url, doi)
         self.cursor.execute(sql, values)
@@ -60,40 +60,8 @@ class DatabaseManager:
         self.cursor.execute(sql, values)
         self.connection.commit()
 
-    def insert_paper_external_id(self, paper_id, arxiv_id=None, doi=None, pubmed_id=None, dblp_id=None):
-        sql = '''
-        INSERT INTO paper_external_ids (paper_id, arxiv_id, doi, pubmed_id, dblp_id)
-        VALUES (?, ?, ?, ?, ?)
-        '''
-        values = (paper_id, arxiv_id, doi, pubmed_id, dblp_id)
-        self.cursor.execute(sql, values)
-        self.connection.commit()
-        return self.cursor.lastrowid
-
-    def insert_paper_figure(self, paper_id, figure_id, caption=None):
-        sql = '''
-        INSERT INTO paper_figures (paper_id, figure_id, caption)
-        VALUES (?, ?, ?)
-        '''
-        values = (paper_id, figure_id, caption)
-        self.cursor.execute(sql, values)
-        self.connection.commit()
-        return self.cursor.lastrowid
-
-    def insert_citation(self, paper_id=None, author_id=None, citation_year=None, citation_count=0,
-                        citing_paper_id=None):
-        sql = '''
-        INSERT INTO citations (paper_id, author_id, citation_year, citation_count, citing_paper_id)
-        VALUES (?, ?, ?, ?, ?)
-        '''
-        values = (paper_id, author_id, citation_year, citation_count, citing_paper_id)
-        self.cursor.execute(sql, values)
-        self.connection.commit()
-        return self.cursor.lastrowid
-
     def close_connection(self):
         self.connection.close()
-
 
     def get_or_create_author(self, name, **kwargs):
         sql = "SELECT id FROM authors WHERE name = ?"
