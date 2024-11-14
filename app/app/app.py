@@ -108,8 +108,9 @@ def index() -> rx.Component:
                     on_click=State.clear_results,
                     margin_top="10px"
                 ),
-                spacing="10px"
+                spacing="1"  # Updated spacing value to be valid
             ),
+
             # Display results
             rx.vstack(
                 rx.foreach(
@@ -119,24 +120,24 @@ def index() -> rx.Component:
                         rx.hstack(
                             rx.text("Authors: ", font_weight="bold"),
                             rx.text(result.authors),
-                            spacing="0px",
+                            spacing="1",
                         ),
                         rx.hstack(
                             rx.text("Published: ", font_weight="bold"),
                             rx.text(result.published),
-                            spacing="0px",
+                            spacing="1",
                         ),
                         rx.cond(
                             result.comment != "",
                             rx.hstack(
                                 rx.text("Comments: ", font_weight="bold"),
                                 rx.text(result.comment),
-                                spacing="0px",
+                                spacing="1",
                             ),
                             rx.hstack(
                                 rx.text("Comments: ", font_weight="bold"),
                                 rx.text("No comments"),
-                                spacing="0px",
+                                spacing="1",
                             )
                         ),
                         rx.cond(
@@ -144,12 +145,12 @@ def index() -> rx.Component:
                             rx.hstack(
                                 rx.text("Journal Reference: ", font_weight="bold"),
                                 rx.text(result.journal_ref),
-                                spacing="0px",
+                                spacing="1",
                             ),
                             rx.hstack(
                                 rx.text("Journal Reference: ", font_weight="bold"),
                                 rx.text("No journal reference"),
-                                spacing="0px",
+                                spacing="1",
                             )
                         ),
                         rx.text(result.summary),
