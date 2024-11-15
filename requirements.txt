@@ -1,9 +1,15 @@
-#APIs
+# APIs
 arxiv
+requests==2.26.0
 
-#GUI
+# Database
+psycopg2-binary
+SQLAlchemy==1.4.41
+python-dotenv==0.19.2
+
+# GUI
 reflex
 
-#testing
+# Testing
 pytest
 pytest-cov
