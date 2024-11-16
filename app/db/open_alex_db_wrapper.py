@@ -1,163 +1,209 @@
+# OpenAlexDbWrapper.py
+
 import sys
 import os
+import hashlib
 
 # Add the project root to sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, '..', '..'))
 sys.path.append(project_root)
 
-from app.db.DatabaseManager import DatabaseManager
-from app.APIs.open_alex.open_alex_wrapper import openalex_api_handler
+from app.db.DatabaseManager import DatabaseManager  # Adjust the import path as necessary
+from app.APIs.open_alex.open_alex_wrapper import openalex_api_handler  # Ensure the correct path
 
-def main():
-    # Prompt the user for the query keyword
-    query = input('Enter the query string to search OpenAlex: ')
+class OpenAlexDbWrapper:
+    def __init__(self):
+        self.api_handler = openalex_api_handler()
+        self.db_manager = DatabaseManager()
 
-    # Initialize the database manager and API handler
-    manager = DatabaseManager("data.db")
-    handler = openalex_api_handler()
+    def generate_openalex_id(self, prefix, identifier):
+        """
+        Generate a unique openalex_id using SHA-256 hashing.
+        
+        Args:
+            prefix (str): A prefix to distinguish the type (e.g., 'OPENALEX_AUTHOR_', 'OPENALEX_CONCEPT_').
+            identifier (str): The string to hash (e.g., author name, concept name).
+        
+        Returns:
+            str: A unique openalex_id.
+        """
+        hash_object = hashlib.sha256(identifier.encode())
+        hex_dig = hash_object.hexdigest()
+        return f"{prefix}{hex_dig[:10]}"  # Truncate for brevity
 
-    # Start querying
-    print(f"Querying OpenAlex for: {query}...")
-    results_generator = handler.query(query, None)
+    def query_and_store(self, query, max_results=None):
+        count = 0
+        inserted_papers = 0
+        print(f"Querying OpenAlex for: '{query}'...")
+        try:
+            for result in self.api_handler.query(query, max_results=max_results):
+                count += 1
 
-    processed_count = 0
-    inserted_papers = 0
+                try:
+                    # Extract necessary fields from the OpenAlex work
+                    paper_openalex_id = result.get('id', '')
+                    title = result.get('title', ['No Title'])[0] if isinstance(result.get('title'), list) else result.get('title', 'No Title')
+                    
+                    # Option 1: Use 'displayed_abstract' if available
+                    abstract = result.get('displayed_abstract', None)
+                    
+                    # Option 2: Serialize 'abstract_inverted_index'
+                    # abstract_dict = result.get('abstract_inverted_index', None)
+                    # abstract = json.dumps(abstract_dict) if abstract_dict else None
+                    
+                    publication_year = self.extract_year(result.get('publication_year', None))
+                    doi = result.get('doi', None)
+                    pdf_url = self.extract_pdf_url(result.get('host_venue', {}).get('url', None))  # OpenAlex may not provide direct PDF URLs
 
-    # Process results iteratively
-    for result in results_generator:
-        processed_count += 1
+                    # Insert paper information into the database
+                    paper_id = self.db_manager.insert_paper(
+                        openalex_id=paper_openalex_id,
+                        title=title,
+                        abstract=abstract,  # Ensure this is a string or None
+                        publication_year=publication_year,
+                        journal_id=None,  # OpenAlex provides host_venue, which can be mapped to journals if needed
+                        total_citations=result.get('cited_by_count', 0),
+                        citations_per_year=result.get('cited_by_count', 0) / (2024 - publication_year) if publication_year else 0.0,
+                        rank_citations_per_year=0,  # Placeholder as OpenAlex does not provide rank
+                        pdf_url=pdf_url,
+                        doi=doi,
+                        influential_citations=result.get('cited_by_influential_count', 0),
+                        delta_citations=0  # Placeholder; requires tracking over time
+                    )
 
-        # Extract relevant fields from the result
-        openalex_id = result.get('id')  # e.g., "https://openalex.org/Wxxxxxx"
-        doi = result.get('doi')
-        title = result.get('title') or 'No Title'  # Use 'No Title' if None or not provided
-        if title is None or title.strip() == "":
-            title = "No Title"
+                    if paper_id:
+                        inserted_papers += 1
+                        print(f"\nInserting paper {inserted_papers}: '{title}' with ID: {paper_id}.")
+                    else:
+                        print(f"\nFailed to insert/update paper: '{title}'. Skipping further processing for this paper.")
+                        continue
 
-        # Construct the abstract string from the abstract_inverted_index
-        abstract = extract_abstract(result.get('abstract_inverted_index', None))
+                    # Insert author information
+                    for author in result.get('authorships', []):
+                        author_info = author.get('author', {})
+                        author_name = self.format_author_name(author_info)
+                        if not author_name:
+                            print("Author name is missing. Skipping this author.")
+                            continue
 
-        publication_year = result.get('publication_year')
-        total_citations = result.get('cited_by_count', 0)
+                        # Generate a unique openalex_id for the author
+                        author_openalex_id = self.generate_openalex_id('OPENALEX_AUTHOR_', author_info.get('id', ''))
 
-        # Attempt to extract a PDF URL if available
-        pdf_url = extract_pdf_url(result)
+                        # Insert or update the author
+                        author_id = self.db_manager.insert_author(
+                            openalex_id=author_openalex_id,
+                            name=author_name,
+                            first_publication_year=0,  # Placeholder as OpenAlex may not provide this directly
+                            author_age=0,  # Placeholder
+                            h_index=0,  # Placeholder
+                            delta_h_index=0,  # Placeholder
+                            adopters=0,  # Placeholder
+                            total_papers=0,  # Placeholder
+                            delta_total_papers=0,  # Placeholder
+                            recent_coauthors=0,  # Placeholder
+                            coauthor_pagerank=0.0,  # Placeholder
+                            total_citations=0,  # Placeholder
+                            citations_per_paper=0.0,  # Placeholder
+                            max_citations=0,  # Placeholder
+                            total_journals=0  # Placeholder
+                        )
 
-        # Attempt to extract journal information if available
-        journal_id = None
-        host_venue = result.get('host_venue', None)
-        if host_venue:
-            journal_name = host_venue.get('display_name')
-            if journal_name:
-                journal_id = manager.get_or_create_journal(
-                    journal_name=journal_name,
-                    mean_citations_per_paper=0.0,  # Placeholder; update as needed
-                    delta_mean_citations_per_paper=0.0,  # Placeholder
-                    journal_h_index=0,  # Placeholder
-                    delta_journal_h_index=0,  # Placeholder
-                    max_citations_paper=0,  # Placeholder
-                    total_papers_published=0,  # Placeholder
-                    delta_total_papers_published=0  # Placeholder
-                )
+                        if not author_id:
+                            print(f"Failed to insert/update author: '{author_name}'. Skipping this author.")
+                            continue
 
-        # Check if a paper with the same DOI already exists
-        existing_paper = manager.get_paper_by_doi(doi)
+                        # Insert paper-author relationship
+                        self.db_manager.insert_paper_author(paper_id=paper_id, author_id=author_id)
 
-        if not existing_paper:
-            # Insert the paper into the database
-            inserted_papers += 1
-            print(f"Inserting paper {inserted_papers}: {title}")
-            paper_id = manager.insert_paper(
-                corpus_id=openalex_id,
-                title=title,
-                abstract=abstract,
-                publication_year=publication_year,
-                journal_id=journal_id,
-                total_citations=total_citations,
-                influential_citations=0,
-                delta_citations=0,
-                citations_per_year=0.0,
-                rank_citations_per_year=None,
-                pdf_url=pdf_url,
-                doi=doi
-            )
-        else:
-            # Use the existing paper ID if found
-            paper_id = existing_paper['id']
+                    # Insert concept (subject) information
+                    for concept in result.get('concepts', []):
+                        concept_name = concept.get('display_name', None)
+                        if not concept_name:
+                            print("Concept name is missing. Skipping this concept.")
+                            continue
 
-        # Process authors (insert or get existing authors and paper_authors associations)
-        authorships = result.get('authorships', [])
-        for authorship in authorships:
-            author_data = authorship.get('author', {})
-            author_name = author_data.get('display_name') or 'Unknown Author'
+                        # Generate a unique openalex_id for the concept
+                        concept_openalex_id = self.generate_openalex_id('OPENALEX_CONCEPT_', concept.get('id', ''))
 
-            # Attempt to get the author's OpenAlex ID (if needed)
-            author_openalex_id = author_data.get('id')
-            
-            author_id = manager.get_or_create_author(
-                name=author_name,
-                first_publication_year=None,   # Placeholder
-                author_age=None,               # Placeholder
-                h_index=0,                     # Placeholder
-                delta_h_index=None,            # Placeholder
-                adopters=0,                    # Placeholder
-                total_papers=0,                # Placeholder
-                delta_total_papers=None,       # Placeholder
-                recent_coauthors=None,         # Placeholder
-                coauthor_pagerank=0.0,         # Placeholder
-                total_citations=0              # Placeholder
-            )
+                        # Insert or update the concept
+                        concept_id = self.db_manager.insert_concept(
+                            openalex_id=concept_openalex_id,
+                            name=concept_name
+                        )
 
-            # Insert into paper_authors association table using insert_or_ignore_paper_author
-            manager.insert_or_ignore_paper_author(
-                paper_id=paper_id,
-                author_id=author_id
-            )
+                        if not concept_id:
+                            print(f"Failed to insert/update concept: '{concept_name}'. Skipping this concept.")
+                            continue
 
-    # Print summary
-    if processed_count == 0:
-        print("No results found for the given query.")
-    else:
-        print(f"Processed {processed_count} results from OpenAlex. Inserted {inserted_papers} new papers into the database.")
+                        # Insert paper-concept relationship
+                        self.db_manager.insert_paper_concept(
+                            paper_id=paper_id,
+                            concept_id=concept_id,
+                            score=None  # Placeholder as OpenAlex does not provide a score
+                        )
 
-    # Close the database connection
-    manager.close_connection()
+                except Exception as e:
+                    print(f"An error occurred while processing paper '{title}': {e}. Skipping this paper.")
 
-def extract_abstract(abstract_inverted_index):
-    """
-    Extracts a readable abstract from the OpenAlex `abstract_inverted_index` if available.
-    """
-    if not abstract_inverted_index:
+                if max_results is not None and count >= max_results:
+                    break
+        except Exception as e:
+            print(f"An error occurred during querying: {e}")
+        finally:
+            print(f"Processed {count} results from OpenAlex. Inserted {inserted_papers} new papers into the database.")
+            self.db_manager.close()
+
+    def extract_year(self, publication_year):
+        """
+        Extract and validate the publication year.
+        
+        Args:
+            publication_year (int or None): The publication year from OpenAlex.
+        
+        Returns:
+            int or None: The publication year if valid, else None.
+        """
+        if isinstance(publication_year, int) and 1000 < publication_year <= 2024:
+            return publication_year
         return None
 
-    # `abstract_inverted_index` is a dictionary where keys are words and values are lists of positions.
-    # We need to reconstruct the abstract from these positions.
-    word_positions = []
-    for word, positions in abstract_inverted_index.items():
-        for pos in positions:
-            word_positions.append((pos, word))
+    def extract_pdf_url(self, host_venue_url):
+        """
+        Extract the PDF URL. OpenAlex may not provide direct PDF URLs, so this is a placeholder.
+        
+        Args:
+            host_venue_url (str or None): The URL of the host venue.
+        
+        Returns:
+            str or None: The PDF URL if available, else None.
+        """
+        # OpenAlex does not provide direct PDF URLs. This function can be enhanced if such information is available.
+        return None
 
-    # Sort words by their position
-    word_positions.sort(key=lambda x: x[0])
-    # Join the words to form the abstract text
-    abstract = " ".join([w[1] for w in word_positions])
-    return abstract
+    def format_author_name(self, author):
+        """
+        Format the author's name from the OpenAlex API response.
+        
+        Args:
+            author (dict): Author information from OpenAlex API.
+        
+        Returns:
+            str: Formatted author name.
+        """
+        display_name = author.get('display_name', '').strip()
+        if display_name:
+            return display_name
+        return None
 
-def extract_pdf_url(work_result):
-    """
-    Extracts a PDF or best available URL from the given OpenAlex work result.
-    """
-    # Check if there's a direct PDF URL under primary_location
-    primary_location = work_result.get('primary_location', {})
-    pdf_url = primary_location.get('pdf_url', None)
+if __name__ == "__main__":
+    openalex_wrapper = OpenAlexDbWrapper()
+    query = input("Enter the query string to search OpenAlex: ")
+    try:
+        max_results_input = input("Enter the maximum number of results to retrieve (press Enter for default 1000): ")
+        max_results = int(max_results_input) if max_results_input.strip() else None
+    except ValueError:
+        print("Invalid input for max_results. Using default value.")
+        max_results = None
 
-    # If no pdf_url, check if any host_urls might be appropriate
-    if not pdf_url:
-        host_venue = work_result.get('host_venue', {})
-        if host_venue:
-            pdf_url = host_venue.get('url', None)  # Use the host venue URL if provided
-    return pdf_url
-
-if __name__ == '__main__':
-    main()
+    openalex_wrapper.query_and_store(query, max_results=max_results)

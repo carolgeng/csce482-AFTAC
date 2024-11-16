@@ -42,7 +42,7 @@ class ArxivDbWrapper:
                     # Insert paper information into the database
                     paper_openalex_id = result.entry_id  # Assuming entry_id is unique and suitable
                     inserted_papers += 1
-                    print(f"Inserting paper {inserted_papers}: {result.title}")
+                    print(f"\nInserting paper {inserted_papers}: {result.title}")
                     paper_id = self.db_manager.insert_paper(
                         openalex_id=paper_openalex_id,
                         title=result.title,
@@ -59,7 +59,7 @@ class ArxivDbWrapper:
                     )
 
                     if not paper_id:
-                        print(f"Failed to insert/update paper: {result.title}. Skipping further processing for this paper.")
+                        print(f"\nFailed to insert/update paper: {result.title}. Skipping further processing for this paper.")
                         continue
 
                     # Insert author information
@@ -138,4 +138,14 @@ class ArxivDbWrapper:
 if __name__ == "__main__":
     arxiv_wrapper = ArxivDbWrapper()
     query = input("Enter the query string to search arXiv: ")
-    arxiv_wrapper.query_and_store(query, max_results=5)
+
+    try:
+        max_results_input = input("Enter the maximum number of results to retrieve (press Enter for default 1000): ")
+        max_results = int(max_results_input) if max_results_input.strip() else None
+    except ValueError:
+        print("Invalid input for max_results. Using default value.")
+        max_results = None
+    
+    arxiv_wrapper.query_and_store(query, max_results)
+
+    
