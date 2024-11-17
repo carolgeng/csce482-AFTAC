@@ -39,7 +39,7 @@ class Article(rx.Base):
 
 class State(rx.State):
 
-    # for oauth use token instead of goole client secret
+    # for oauth use token instead of goole client secret 
     id_token_json: str = rx.LocalStorage()
 
     def on_success(self, id_token: dict):
