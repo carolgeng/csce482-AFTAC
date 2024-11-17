@@ -18,8 +18,6 @@ from rxconfig import config
 from APIs.arXiv.arXiv_wrapper import api_handler
 from datetime import datetime
 
-import reflex as rx
-
 # gets client id from env file
 load_dotenv()
 CLIENT_ID = os.getenv('CLIENT_ID')
@@ -30,9 +28,6 @@ class Article(rx.Base):
     authors: str
     summary: str
     pdf_url: str
-    published: str
-    comment: str = ""
-    journal_ref: str = ""
     published: str
     comment: str = ""
     journal_ref: str = ""
@@ -94,14 +89,6 @@ class State(rx.State):
         """Set the number of articles."""
         self.num_articles = value
 
-    def set_keywords(self, value):
-        """Set the search keywords."""
-        self.keywords = value
-
-    def set_num_articles(self, value):
-        """Set the number of articles."""
-        self.num_articles = value
-
     def search_articles(self):
         """Function to handle article search."""
         handler = api_handler()
@@ -134,7 +121,6 @@ class State(rx.State):
                 comment=(getattr(result, 'comment', '') or ''),
                 journal_ref=journal_ref,
             )
-            self.results.append(article)
             self.results.append(article)
 
     def clear_results(self):
@@ -191,7 +177,6 @@ def require_google_login(page) -> rx.Component:
 def protected() -> rx.Component:
     """The protected page where users can search for articles."""
     return rx.container(
-        # Use the standard button to toggle color mode
         # Use the standard button to toggle color mode
         rx.color_mode.button(position="top-right"),
         rx.vstack(
