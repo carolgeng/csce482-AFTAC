@@ -11,6 +11,10 @@ from .react_oauth_google import (
 )
 from dotenv import load_dotenv
 
+# to export csv
+import csv
+from io import StringIO
+
 # for article serach app
 import reflex as rx
 from datetime import datetime
@@ -98,7 +102,6 @@ class State(rx.State):
         except ValueError:
             num_articles_int = 10  # Default or handle error
 
-
         # Get the generator of results
         results_generator = handler.query(self.keywords, num_articles_int)
         
@@ -128,6 +131,37 @@ class State(rx.State):
         self.results = []
         self.keywords = ""
         self.num_articles = "10"
+
+    @rx.event
+    def export_results_to_csv(self):
+        """Export search results to a CSV with title, authors, and published date."""
+        if not self.results:
+            print("No results to export!")
+            return
+        
+        output = StringIO()
+        writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL) # for nicer formatting
+        
+        # header
+        writer.writerow(["Title", "Authors", "Published"])
+        
+        # data
+        for article in self.results:
+            writer.writerow([
+                article.title,
+                article.authors,
+                article.published,
+            ])
+        
+        output.seek(0)
+        filename = "search_results.csv"
+
+        return rx.download(
+            data=output.getvalue(),
+            filename=filename,
+        )
+
+
 
 def user_info(tokeninfo: dict) -> rx.Component:
     """Display the user's information, including avatar and email."""
@@ -177,7 +211,6 @@ def require_google_login(page) -> rx.Component:
 def protected() -> rx.Component:
     """The protected page where users can search for articles."""
     return rx.container(
-        # Use the standard button to toggle color mode
         rx.color_mode.button(position="top-right"),
         rx.vstack(
             user_info(State.tokeninfo),
@@ -186,14 +219,14 @@ def protected() -> rx.Component:
                 "Enter keywords to find relevant articles.",
                 font_size="lg"
             ),
-            # Input field for keywords
+            # input box for keyword search
             rx.input(
                 placeholder="Enter keywords...",
                 on_change=State.set_keywords,
                 value=State.keywords,
                 width="300px"
             ),
-            # Input field for number of articles
+            # input box for num of articles
             rx.input(
                 placeholder="Number of articles...",
                 on_change=State.set_num_articles,
@@ -201,25 +234,27 @@ def protected() -> rx.Component:
                 width="300px",
                 type_="number",
                 min="1"
-            ),
-            # Buttons container
-            rx.hstack(
-                # Search button
-                rx.button(
+            ),                
+            rx.button(
                     "Search",
                     on_click=State.search_articles,
                     margin_top="10px"
-                ),
-                # Clear Results button
+            ),
+            rx.hstack(
                 rx.button(
                     "Clear Results",
                     on_click=State.clear_results,
                     margin_top="10px"
                 ),
-                spacing="1"  # Updated spacing value to be valid
+                rx.button(
+                    "Export to CSV",
+                    on_click=State.export_results_to_csv,
+                    margin_top="10px"
+                ),
+                spacing="1"  
             ),
 
-            # Display results
+            # display results
             rx.vstack(
                 rx.foreach(
                     State.results,
