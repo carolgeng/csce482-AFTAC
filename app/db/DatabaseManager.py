@@ -405,7 +405,7 @@ class DatabaseManager:
         try:
             self.cursor.close()
             self.connection.close()
-            print("Database connection closed.")
+            print("Database connection closed.\n")
         except psycopg2.Error as e:
             print(f"Error closing the database connection: {e}")
 
