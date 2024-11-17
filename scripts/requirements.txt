@@ -1,15 +1,10 @@
-# APIs
+#APIs
 arxiv
-requests==2.26.0
 
-# Database
-psycopg2-binary
-python-dotenv==0.19.2
-
-# GUI
+#GUI
 reflex
 
-# Testing
+#testing
 pytest
 pytest-cov
 
