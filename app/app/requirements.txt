@@ -1,6 +1,0 @@
-reflex==0.6.4
-
-#auth
-google-auth
-google-auth-oauthlib
-google-auth[requests]
