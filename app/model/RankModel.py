@@ -5,7 +5,7 @@ import pickle
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from database.DatabaseManager import DatabaseManager
+from ..database.DatabaseManager import DatabaseManager
 from dotenv import load_dotenv
 from sklearn.preprocessing import MinMaxScaler
 
