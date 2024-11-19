@@ -40,6 +40,9 @@ class State(rx.State):
     def on_success(self, id_token: dict):
         """Handle successful login and store the ID token."""
         self.id_token_json = json.dumps(id_token)
+        # routing to user page
+        if self.user_logged_in:
+            rx.redirect("/user")
 
     @rx.var(cache=True)
     def tokeninfo(self) -> dict[str, str]:
