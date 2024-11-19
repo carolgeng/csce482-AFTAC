@@ -20,8 +20,8 @@ class api_handler:
         except requests.exceptions.RequestException as e:
             print(f"An error occurred while querying CrossRef: {e}")
 
-# Example usage
-if __name__ == "__main__":
-    handler = api_handler()
-    for result in handler.query("machine learning", max_results=5):
-        print(result.get("DOI"), result.get("title", ["No Title"])[0])
+# # Example usage
+# if __name__ == "__main__":
+#     handler = api_handler()
+#     for result in handler.query("machine learning", max_results=5):
+#         print(result.get("DOI"), result.get("title", ["No Title"])[0])

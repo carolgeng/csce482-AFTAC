@@ -42,13 +42,13 @@ class api_handler:
         except ValueError as e:
             print(f"An error occurred while parsing the response: {e}")
 
-# Example usage
-if __name__ == "__main__":
-    # Load the API key from the .env file
-    api_key = os.getenv("SEMANTIC_SCHOLAR_API_KEY")
-    if not api_key:
-        print("Error: API key not found. Please set SEMANTIC_SCHOLAR_API_KEY in your .env file.")
-    else:
-        handler = api_handler(api_key=api_key)
-        for result in handler.query("machine learning", max_results=5):
-            print(result.get("externalIds", {}).get("DOI"), result.get("title", "No Title"))
+# # Example usage
+# if __name__ == "__main__":
+#     # Load the API key from the .env file
+#     api_key = os.getenv("SEMANTIC_SCHOLAR_API_KEY")
+#     if not api_key:
+#         print("Error: API key not found. Please set SEMANTIC_SCHOLAR_API_KEY in your .env file.")
+#     else:
+#         handler = api_handler(api_key=api_key)
+#         for result in handler.query("machine learning", max_results=5):
+#             print(result.get("externalIds", {}).get("DOI"), result.get("title", "No Title"))

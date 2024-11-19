@@ -49,25 +49,25 @@ class openalex_api_handler:
 
         return results_generator()
 
-if __name__ == "__main__":
-    # Create an instance of the handler
-    handler = openalex_api_handler()
+# if __name__ == "__main__":
+#     # Create an instance of the handler
+#     handler = openalex_api_handler()
     
-    # Sample query
-    query_string = "quantum computing"
-    max_results = 5  # We'll limit the results for demonstration
+#     # Sample query
+#     query_string = "quantum computing"
+#     max_results = 5  # We'll limit the results for demonstration
 
-    print(f"Querying OpenAlex for '{query_string}' and retrieving up to {max_results} results...")
+#     print(f"Querying OpenAlex for '{query_string}' and retrieving up to {max_results} results...")
 
-    # Get the generator for query results
-    results_generator = handler.query(query_string, max_results)
+#     # Get the generator for query results
+#     results_generator = handler.query(query_string, max_results)
 
-    # Iterate over the returned results and print them out
-    for i, result in enumerate(results_generator, start=1):
-        title = result.get('title', 'No Title')
-        openalex_id = result.get('id', 'No ID')
-        doi = result.get('doi', 'No DOI')
-        print(f"\nResult {i}:")
-        print(f"  Title: {title}")
-        print(f"  OpenAlex ID: {openalex_id}")
-        print(f"  DOI: {doi}")
+#     # Iterate over the returned results and print them out
+#     for i, result in enumerate(results_generator, start=1):
+#         title = result.get('title', 'No Title')
+#         openalex_id = result.get('id', 'No ID')
+#         doi = result.get('doi', 'No DOI')
+#         print(f"\nResult {i}:")
+#         print(f"  Title: {title}")
+#         print(f"  OpenAlex ID: {openalex_id}")
+#         print(f"  DOI: {doi}")
