@@ -22,11 +22,7 @@ This application is the Fall 2024 capstone project of:
     deactivate
     ```
 
-2. **Database Setup**:  
-   Run the `db_reset.sh` script to create the SQLite database (used tentatively).  
-   - Running this script will reset (empty) the database if it already exists.
-
-3. **Run Tests**:  
+2. **Run Tests**:  
    Run the `run_tests.sh` script to:
    - Set the Python path
    - Run tests
@@ -35,7 +31,7 @@ This application is the Fall 2024 capstone project of:
    ```bash
    ./run_tests.sh
 
-4. **To actually run the app, cd into the app directory and run the following commands:**
+3. **To actually run the app, cd into the app directory and run the following commands:**
     - reflex init
     - reflex run
     - if you do any of the commands outside of the app directory, it will create a reflex app outside of the reflex app so please be sure you cd into the app directory first and don't forget to cd out when you're done
