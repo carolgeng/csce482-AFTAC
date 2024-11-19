@@ -24,20 +24,36 @@ def user_page() -> rx.Component:
                 value=State.keywords,
                 width="300px"
             ),
-            # Input box for number of articles
-            rx.input(
-                placeholder="Number of articles...",
-                on_change=State.set_num_articles,
-                value=State.num_articles,
-                width="300px",
-                type_="number",
-                min="1"
+            
+            rx.hstack(
+                rx.input(
+                    placeholder="Number of articles...",
+                    on_change=State.set_num_articles,
+                    value=State.num_articles,
+                    width="300px",
+                    type_="number",
+                    min="1"
+                ),
+                rx.button(
+                    "Search",
+                    on_click=State.search_articles,
+                    background_color="blue",
+                    padding="10px"
+                ),
+                spacing="3",
             ),
 
             rx.hstack(
+                 rx.button(
+                    "Clear Results",
+                    on_click=State.clear_results,
+                    background_color="blue",
+                    margin_top="10px"
+                ),
                 rx.button(
                     "Export to CSV",
                     on_click=State.export_results_to_csv,
+                    background_color="blue",
                     margin_top="10px"
                 ),
                 spacing="1"

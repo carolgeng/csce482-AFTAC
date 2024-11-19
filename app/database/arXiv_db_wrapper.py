@@ -5,12 +5,12 @@ import os
 import hashlib
 
 # Add the project root to sys.path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.abspath(os.path.join(current_dir, '..', '..'))
-sys.path.append(project_root)
+# current_dir = os.path.dirname(os.path.abspath(__file__))
+# project_root = os.path.abspath(os.path.join(current_dir, '..', '..'))
+# sys.path.append(project_root)
 
-from app.database.DatabaseManager import DatabaseManager
-from app.APIs.arXiv.arXiv_wrapper import api_handler
+from .DatabaseManager import DatabaseManager
+from APIs.arXiv.arXiv_wrapper import api_handler
 
 class ArxivDbWrapper:
     def __init__(self):
