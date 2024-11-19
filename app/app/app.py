@@ -22,6 +22,9 @@ from rxconfig import config
 from APIs.arXiv.arXiv_wrapper import api_handler
 from datetime import datetime
 
+# for model
+from model.RankModel import RankModel
+
 # gets client id from env file
 load_dotenv()
 CLIENT_ID = os.getenv('CLIENT_ID')
@@ -94,35 +97,36 @@ class State(rx.State):
         self.num_articles = value
 
     def search_articles(self):
-        """Function to handle article search."""
-        handler = api_handler()
-        # Convert num_articles to int
+        """Function to handle article search and ranking."""
         try:
             num_articles_int = int(self.num_articles)
         except ValueError:
             num_articles_int = 10  # Default or handle error
 
-        # Get the generator of results
-        results_generator = handler.query(self.keywords, num_articles_int)
+        rank_model = RankModel()
+        # Get ranked articles from the model
+        ranked_articles = rank_model.rank_articles(self.keywords, num_articles=num_articles_int)
         
         # Initialize an empty list to store articles
         self.results = []
-        for result in results_generator:
-            # Convert published to string
-            published_str = result.published.strftime('%Y-%m-%d %H:%M:%S') if result.published else ''
+        if ranked_articles.empty:
+            print("No articles found for the given query.")
+            return
 
-            # Ensure journal_ref is a string
-            journal_ref = getattr(result, 'journal_ref', '') or ''
-
+        for _, result in ranked_articles.iterrows():
+            # Filter out None values in authors
+            authors_list = [a for a in result['authors'] if a] if result['authors'] else []
+            authors_str = ', '.join(authors_list) if authors_list else 'Unknown'
+            
             # Create Article instance
             article = Article(
-                title=result.title,
-                authors=', '.join([author.name for author in result.authors]),
-                summary=result.summary,
-                pdf_url=result.pdf_url,
-                published=published_str,
-                comment=(getattr(result, 'comment', '') or ''),
-                journal_ref=journal_ref,
+                title=result['title'],
+                authors=authors_str,
+                summary=result['abstract'] or 'No abstract available.',
+                pdf_url=result['pdf_url'] or '#',
+                published=str(result['publication_year']) or 'Unknown',
+                comment="",  # You can update this if comments are available
+                journal_ref="",  # Update if journal references are available
             )
             self.results.append(article)
 
@@ -322,4 +326,3 @@ def protected() -> rx.Component:
 
 
 app = rx.App()
-
