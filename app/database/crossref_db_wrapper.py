@@ -1,7 +1,8 @@
+# CrossRefDbWrapper.py
+
 import sys
 import os
-import requests
-from datetime import datetime
+import hashlib
 
 # Add the project root to sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -10,119 +11,183 @@ sys.path.append(project_root)
 
 from app.database.DatabaseManager import DatabaseManager
 from app.APIs.crossref.crossref_wrapper import api_handler
+class CrossRefDbWrapper:
+    def __init__(self):
+        self.api_handler = api_handler()
+        self.db_manager = DatabaseManager()
 
-def extract_date(date_parts):
-    """Extracts the year from the 'date-parts' field."""
-    if date_parts and isinstance(date_parts, list) and len(date_parts) > 0:
-        return date_parts[0][0]  # Returns the year
-    return None
+    def generate_openalex_id(self, prefix, identifier):
+        """
+        Generate a unique openalex_id using SHA-256 hashing.
+        Args:
+            prefix (str): A prefix to distinguish the type (e.g., 'CROSSREF_AUTHOR_', 'CROSSREF_CONCEPT_').
+            identifier (str): The string to hash (e.g., author name, category).
+        Returns:
+            str: A unique openalex_id.
+        """
+        hash_object = hashlib.sha256(identifier.encode())
+        hex_dig = hash_object.hexdigest()
+        return f"{prefix}{hex_dig[:10]}"  # Truncate for brevity
 
-def main():
-    # Prompt the user for the query keyword
-    query = input('Enter the query string to search CrossRef: ')
+    def query_and_store(self, query, max_results=None):
+        count = 0
+        inserted_papers = 0
+        print(f"Querying CrossRef for: {query}...")
+        try:
+            for result in self.api_handler.query(query, max_results=max_results):
+                count += 1
 
-    # Initialize the database manager and API handler
-    manager = DatabaseManager("data.db")
-    handler = api_handler()
+                try:
+                    # Insert paper information into the database
+                    paper_openalex_id = self.generate_openalex_id('CROSSREF_PAPER_', result.get('DOI', ''))
+                    inserted_papers += 1
+                    print(f"\nInserting paper {inserted_papers}: {result.get('title', ['No Title'])[0]}")
+                    paper_id = self.db_manager.insert_paper(
+                        openalex_id=paper_openalex_id,
+                        title=result.get('title', ['No Title'])[0],
+                        abstract=result.get('abstract', None),
+                        publication_year=self.extract_year(result.get('published', {}).get('date-parts', [[None]])[0][0]),
+                        journal_id=None,  # Assuming journal info is not directly available or requires separate handling
+                        total_citations=0,  # Placeholder as CrossRef does not provide citation counts
+                        citations_per_year=0.0,  # Placeholder
+                        rank_citations_per_year=0,  # Placeholder
+                        pdf_url=self.extract_pdf_url(result.get('link', [])),
+                        doi=result.get('DOI', None),
+                        influential_citations=0,  # Placeholder
+                        delta_citations=0  # Placeholder
+                    )
 
-    # Start querying
-    print(f"Querying CrossRef for: {query}...")
-    results_generator = handler.query(query, None)
+                    if not paper_id:
+                        print(f"\nFailed to insert/update paper: {result.get('title', ['No Title'])[0]}. Skipping further processing for this paper.")
+                        continue
 
-    processed_count = 0
-    inserted_papers = 0
+                    # Insert author information
+                    for author in result.get('author', []):
+                        author_name = self.format_author_name(author)
+                        if not author_name:
+                            print("Author name is missing. Skipping this author.")
+                            continue
 
-    # Process results iteratively
-    for result in results_generator:
-        processed_count += 1
+                        # Generate a unique openalex_id for the author
+                        author_openalex_id = self.generate_openalex_id('CROSSREF_AUTHOR_', author_name)
 
-        # Extract relevant fields from the result
-        doi = result.get("DOI")
-        title = ' '.join(result.get("title", ["No Title"])) if "title" in result else "No Title"
-        abstract = result.get("abstract", None)
-        publication_year = extract_date(result.get("published-print", {}).get("date-parts")) or \
-                           extract_date(result.get("published-online", {}).get("date-parts"))
-        journal_info = result.get("container-title", [])
-        journal_name = journal_info[0] if journal_info else None
-        pdf_url = result.get("URL", None)  # CrossRef provides a URL field which can be used as a link to the paper
+                        # Insert or update the author
+                        author_id = self.db_manager.insert_author(
+                            openalex_id=author_openalex_id,
+                            name=author_name,
+                            first_publication_year=0,  # Using 0 as a placeholder
+                            author_age=0,  # Using 0 as a placeholder
+                            h_index=0,  # Using 0 as a placeholder
+                            delta_h_index=0,  # Using 0 as a placeholder
+                            adopters=0,  # Using 0 as a placeholder
+                            total_papers=0,  # Using 0 as a placeholder
+                            delta_total_papers=0,  # Using 0 as a placeholder
+                            recent_coauthors=0,  # Using 0 as a placeholder
+                            coauthor_pagerank=0.0,  # Using 0.0 as a placeholder
+                            total_citations=0,  # Using 0 as a placeholder
+                            citations_per_paper=0.0,  # Using 0.0 as a placeholder
+                            max_citations=0,  # Using 0 as a placeholder
+                            total_journals=0  # Using 0 as a placeholder
+                        )
 
-        # Check if a paper with the same DOI already exists
-        existing_paper = manager.get_paper_by_doi(doi)
+                        if not author_id:
+                            print(f"Failed to insert/update author: {author_name}. Skipping this author.")
+                            continue
 
-        if not existing_paper:
-            # Insert the journal into the database and get its ID
-            journal_id = None
-            if journal_name:
-                journal_id = manager.get_or_create_journal(
-                    journal_name=journal_name,
-                    mean_citations_per_paper=0.0,  # Placeholder; update as needed
-                    delta_mean_citations_per_paper=0.0,  # Placeholder
-                    journal_h_index=0,  # Placeholder
-                    delta_journal_h_index=0,  # Placeholder
-                    max_citations_paper=0,  # Placeholder
-                    total_papers_published=0,  # Placeholder
-                    delta_total_papers_published=0  # Placeholder
-                )
+                        # Insert paper-author relationship
+                        self.db_manager.insert_paper_author(paper_id=paper_id, author_id=author_id)
 
-            # Insert the paper into the database
-            inserted_papers += 1
-            print(f"Inserting paper {inserted_papers}: {title}")
-            paper_id = manager.insert_paper(
-                corpus_id=None,  # Replace with an actual corpus_id if available
-                title=title,
-                abstract=abstract,
-                publication_year=publication_year,
-                journal_id=journal_id,
-                total_citations=result.get("is-referenced-by-count", 0),
-                influential_citations=0,  # Placeholder; update as needed
-                delta_citations=0,  # Placeholder
-                citations_per_year=0.0,  # Placeholder
-                rank_citations_per_year=None,  # Placeholder
-                pdf_url=pdf_url,
-                doi=doi
-            )
-        else:
-            # Use the existing paper ID if found
-            paper_id = existing_paper['id']
+                    # Insert subject (category) information
+                    for subject in result.get('subject', []):
+                        if not subject:
+                            print("Subject is missing. Skipping this subject.")
+                            continue
 
-        # Process authors (insert or get existing authors and paper_authors associations)
-        if "author" in result and result["author"] is not None:
-            for author in result["author"]:
-                given_name = author.get("given", "")
-                family_name = author.get("family", "")
-                author_name = f"{given_name} {family_name}".strip()
-                affiliation = author.get("affiliation", [])
-                affiliation_name = affiliation[0].get("name") if affiliation else None
+                        # Generate a unique openalex_id for the subject
+                        subject_openalex_id = self.generate_openalex_id('CROSSREF_CONCEPT_', subject)
 
-                
-                author_id = manager.get_or_create_author(
-                    name=author_name,
-                    first_publication_year=0,  # Placeholder; update as needed
-                    author_age=0,  # Placeholder; update as needed
-                    h_index=0,  # Placeholder; update as needed
-                    delta_h_index=0,  # Placeholder
-                    adopters=0,  # Placeholder
-                    total_papers=0,  # Placeholder
-                    delta_total_papers=0,  # Placeholder
-                    recent_coauthors=0,  # Placeholder
-                    coauthor_pagerank=0.0,  # Placeholder
-                    total_citations=0  # Placeholder
-                )
+                        # Insert or update the concept
+                        concept_id = self.db_manager.insert_concept(
+                            openalex_id=subject_openalex_id,
+                            name=subject
+                        )
 
-                # Insert into paper_authors association table using insert_or_ignore_paper_author
-                manager.insert_or_ignore_paper_author(
-                    paper_id=paper_id,
-                    author_id=author_id
-                )
+                        if not concept_id:
+                            print(f"Failed to insert/update concept: {subject}. Skipping this concept.")
+                            continue
 
-    # Print summary
-    if processed_count == 0:
-        print("No results found for the given query.")
-    else:
-        print(f"Processed {processed_count} results from CrossRef. Inserted {inserted_papers} new papers into the database.")
+                        # Insert paper-concept relationship
+                        self.db_manager.insert_paper_concept(
+                            paper_id=paper_id,
+                            concept_id=concept_id,
+                            score=None  # Placeholder as CrossRef does not provide a score
+                        )
 
-    # Close the database connection
-    manager.close_connection()
+                except Exception as e:
+                    print(f"An error occurred while processing paper '{result.get('title', ['No Title'])[0]}': {e}. Skipping this paper.")
 
-if __name__ == '__main__':
-    main()
+                if max_results is not None and count >= max_results:
+                    break
+        except Exception as e:
+            print(f"An error occurred: {e}")
+        finally:
+            print(f"Processed {count} results from CrossRef. Inserted {inserted_papers} new papers into the database.")
+            self.db_manager.close()
+
+    def extract_year(self, date_part):
+        """
+        Extract the year from the date-parts list.
+        Args:
+            date_part (list or int): The date parts from CrossRef API.
+        Returns:
+            int or None: The publication year.
+        """
+        try:
+            if isinstance(date_part, list):
+                return date_part[0]
+            return int(date_part)
+        except (IndexError, ValueError, TypeError):
+            return None
+
+    def extract_pdf_url(self, links):
+        """
+        Extract the PDF URL from the list of links.
+        Args:
+            links (list): List of link dictionaries from CrossRef API.
+        Returns:
+            str or None: The PDF URL if available.
+        """
+        for link in links:
+            if link.get('content-type') == 'application/pdf':
+                return link.get('URL')
+        return None
+
+    def format_author_name(self, author):
+        """
+        Format the author's name from the CrossRef API response.
+        Args:
+            author (dict): Author information from CrossRef API.
+        Returns:
+            str: Formatted author name.
+        """
+        given = author.get('given', '').strip()
+        family = author.get('family', '').strip()
+        if given and family:
+            return f"{given} {family}"
+        elif family:
+            return family
+        elif given:
+            return given
+        return None
+
+if __name__ == "__main__":
+    crossref_wrapper = CrossRefDbWrapper()
+    query = input("Enter the query string to search CrossRef: ")
+    try:
+        max_results_input = input("Enter the maximum number of results to retrieve (press Enter for default 1000): ")
+        max_results = int(max_results_input) if max_results_input.strip() else None
+    except ValueError:
+        print("Invalid input for max_results. Using default value.")
+        max_results = None
+
+    crossref_wrapper.query_and_store(query, max_results=max_results)
