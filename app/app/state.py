@@ -40,9 +40,7 @@ class State(rx.State):
     def on_success(self, id_token: dict):
         """Handle successful login and store the ID token."""
         self.id_token_json = json.dumps(id_token)
-        # routing to user page
-        if self.user_logged_in:
-            rx.redirect("/user")
+        return rx.redirect("/user")
 
     @rx.var(cache=True)
     def tokeninfo(self) -> dict[str, str]:
@@ -63,6 +61,7 @@ class State(rx.State):
     def logout(self):
         """Log the user out by clearing the ID token."""
         self.id_token_json = ""
+        return rx.redirect("/")
 
     @rx.var
     def token_is_valid(self) -> bool:

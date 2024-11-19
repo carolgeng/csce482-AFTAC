@@ -33,17 +33,8 @@ def user_page() -> rx.Component:
                 type_="number",
                 min="1"
             ),
-            rx.button(
-                "Search",
-                on_click=State.search_articles,
-                margin_top="10px"
-            ),
+
             rx.hstack(
-                rx.button(
-                    "Clear Results",
-                    on_click=State.clear_results,
-                    margin_top="10px"
-                ),
                 rx.button(
                     "Export to CSV",
                     on_click=State.export_results_to_csv,
