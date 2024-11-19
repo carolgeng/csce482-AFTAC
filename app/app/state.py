@@ -16,6 +16,7 @@ import reflex as rx
 from APIs.arXiv.arXiv_wrapper import api_handler
 from datetime import datetime
 from model.RankModel import RankModel
+from database.populate_db import DatabaseSearchService
 
 # gets client id from env file
 load_dotenv()
@@ -42,6 +43,14 @@ class State(rx.State):
         """Handle successful login and store the ID token."""
         self.id_token_json = json.dumps(id_token)
         return rx.redirect("/user")
+
+
+    @rx.var(cache=True)
+    def email(self) -> str:
+        """Extract the user's email from tokeninfo."""
+        tokeninfo = self.tokeninfo  # Access the reactive tokeninfo variable
+        # If tokeninfo exists and has an 'email' key, return it, otherwise return an empty string
+        return tokeninfo["email"] if "email" in tokeninfo else ""
 
     @rx.var(cache=True)
     def tokeninfo(self) -> dict[str, str]:
@@ -161,3 +170,19 @@ class State(rx.State):
             data=output.getvalue(),
             filename=filename,
         )
+    
+    def populate_database(self):
+        try:
+            num_articles_int = int(self.num_articles)
+        except ValueError:
+            num_articles_int = 10  # Default or handle error
+        # Initialize the DatabaseSearchService with the query (keywords) and number of articles
+        search_service = DatabaseSearchService(query=self.keywords, num_articles=num_articles_int)
+
+        # Run the search and store the results in the databases
+        search_service.search_and_store()
+
+        print(f"Database populated with {num_articles_int} articles for query '{self.keywords}'.")
+
+        # Optionally clear results or reset fields after population
+        self.clear_results()

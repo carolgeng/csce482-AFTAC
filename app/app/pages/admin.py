@@ -11,7 +11,6 @@ def admin_page() -> rx.Component:
     return rx.container(
         rx.color_mode.button(position="top-right"),
         rx.vstack(
-            user_info(State.tokeninfo),
             rx.heading("AFTAC: AI Driven R&D", size="2xl"),
             rx.text(
                 "Enter keywords to find relevant articles.",
@@ -34,22 +33,18 @@ def admin_page() -> rx.Component:
                 min="1"
             ),
             rx.button(
-                "Search",
-                on_click=State.search_articles,
+                "Retrain",
+                background_color="red",
+                on_click=State.populate_database,
                 margin_top="10px"
             ),
             rx.hstack(
                 rx.button(
-                    "Clear Results",
-                    on_click=State.clear_results,
+                    "Back",
+                    on_click=rx.redirect("/user"),
                     margin_top="10px"
                 ),
-                rx.button(
-                    "Export to CSV",
-                    on_click=State.export_results_to_csv,
-                    margin_top="10px"
-                ),
-                spacing="1"
+        
             ),
             # Display results
             rx.vstack(

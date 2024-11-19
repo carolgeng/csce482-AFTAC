@@ -12,20 +12,24 @@ import os
 load_dotenv()
 CLIENT_ID = os.getenv('CLIENT_ID')
 
-def user_info(tokeninfo: dict) -> rx.Component:
+def user_info(self) -> rx.Component:
     """Display the user's information, including avatar and email."""
+    email = self.email 
     return rx.hstack(
-        rx.avatar(
-            name=tokeninfo["name"],
-            src=tokeninfo["picture"],
-            size="md",
+        
+        rx.button("Logout", on_click=State.logout,background_color="grey",),
+        rx.cond(
+            # we can add AFTAC here
+            (email != "") & ((email == "mev@tamu.edu") | (email == "sulaiman_1@tamu.edu") | (email == "sryeruva@tamu.edu") | (email == "alecklem@tamu.edu") ),  
+            rx.button(
+                "Retrain Model",
+                on_click=lambda: rx.redirect("/admin"),  
+                background_color="red",
+                color="white",
+                padding="10px",
+            ),
+            rx.text(""),  
         ),
-        rx.vstack(
-            rx.heading(tokeninfo["name"], size="md"),
-            rx.text(tokeninfo["email"]),
-            align_items="flex-start",
-        ),
-        rx.button("Logout", on_click=State.logout),
         padding="10px",
     )
 

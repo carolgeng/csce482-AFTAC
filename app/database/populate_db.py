@@ -2,32 +2,38 @@ import sys
 import os
 
 # Add the project root to sys.path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.abspath(os.path.join(current_dir, '..', '..'))
-sys.path.append(project_root)
+# current_dir = os.path.dirname(os.path.abspath(__file__))
+# project_root = os.path.abspath(os.path.join(current_dir, '..', '..'))
+# sys.path.append(project_root)
 
-from app.database.arXiv_db_wrapper import ArxivDbWrapper
-from app.database.crossref_db_wrapper import CrossRefDbWrapper
-from app.database.open_alex_db_wrapper import OpenAlexDbWrapper
-from app.database.semantic_scholar_db_wrapper import SemanticScholarDbWrapper
+from .arXiv_db_wrapper import ArxivDbWrapper
+from .crossref_db_wrapper import CrossRefDbWrapper
+from .open_alex_db_wrapper import OpenAlexDbWrapper
+from .semantic_scholar_db_wrapper import SemanticScholarDbWrapper
 
-query = input("Enter the query string to search: ")
+class DatabaseSearchService:
+    def __init__(self, query: str, num_articles: int = 1000):
+        self.query = query
+        self.num_articles = num_articles
 
-try:
-    quantity = input("Enter the maximum number of results to retrieve (press Enter for default 1000): ")
-    quantity = int(quantity) if quantity.strip() else None
-except ValueError:
-    print("Invalid input for max_results. Using default value.")
-    quantity = None
+        # Initialize the database wrappers
+        self.arxiv_db = ArxivDbWrapper()
+        self.crossref_db = CrossRefDbWrapper()
+        self.openalex_db = OpenAlexDbWrapper()
+        self.semantic_scholar_db = SemanticScholarDbWrapper()
 
-arxiv_db = ArxivDbWrapper()
-crossref_db = CrossRefDbWrapper()
-openalex_db = OpenAlexDbWrapper()
-semantic_scholar_db = SemanticScholarDbWrapper()
+    def search_and_store(self):
+        """Search and store results from all databases using the provided query and number of articles."""
+        try:
+            print(f"Searching for '{self.query}' and retrieving {self.num_articles} results...")
 
-arxiv_db.query_and_store(query, quantity)
-crossref_db.query_and_store(query, quantity)
-openalex_db.query_and_store(query, quantity)
-semantic_scholar_db.query_and_store(query, quantity)
+            # Query and store results in each database
+            self.arxiv_db.query_and_store(self.query, self.num_articles)
+            self.crossref_db.query_and_store(self.query, self.num_articles)
+            self.openalex_db.query_and_store(self.query, self.num_articles)
+            self.semantic_scholar_db.query_and_store(self.query, self.num_articles)
 
+            print("Search completed and results stored in all databases.")
 
+        except Exception as e:
+            print(f"An error occurred during search: {e}")
