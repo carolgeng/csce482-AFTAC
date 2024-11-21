@@ -2,12 +2,17 @@ import os
 import psycopg2
 import pandas as pd
 import pickle
-from sklearn.ensemble import RandomForestRegressor
+import re
+from datetime import datetime
+from sklearn.neural_network import MLPClassifier  # Using classifier instead of regressor
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from database.DatabaseManager import DatabaseManager
 from dotenv import load_dotenv
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.metrics import classification_report, roc_auc_score
+from sklearn.inspection import permutation_importance
 
 class RankModel:
     def __init__(self):
@@ -16,26 +21,69 @@ class RankModel:
         self.database_url = os.getenv('DATABASE_URL')
         self.connection = psycopg2.connect(self.database_url)
         self.db_manager = DatabaseManager()
+        self.scaler = None
         self.model = self.load_model()
-
+    
     def load_model(self):
         model_file = 'ml_model.pkl'
-        if os.path.exists(model_file):
+        scaler_file = 'scaler.pkl'
+        if os.path.exists(model_file) and os.path.exists(scaler_file):
             with open(model_file, 'rb') as f:
                 model = pickle.load(f)
+            with open(scaler_file, 'rb') as f:
+                self.scaler = pickle.load(f)
             print("Loaded existing ML model.")
         else:
             print("Training new ML model...")
             model = self.train_ml_model()
         return model
-
+    
     def train_ml_model(self):
         # Fetch articles data from the database
         articles = self.get_articles_from_db()
 
-        # Select relevant features for impact prediction
-        features = articles[[
-            'publication_year',
+        # Parse the list of influential articles
+        influential_titles = self.get_influential_titles('top100MLpapers.txt')
+
+        # Label articles
+        articles['is_influential'] = articles['title'].apply(
+            lambda x: 1 if x.lower() in influential_titles else 0
+        )
+
+        # Handle class imbalance
+        from sklearn.utils import resample
+
+        # Separate majority and minority classes
+        df_majority = articles[articles.is_influential == 0]
+        df_minority = articles[articles.is_influential == 1]
+
+        if df_minority.empty:
+            print("No influential articles found in the dataset.")
+            return None
+
+        # Upsample minority class
+        df_minority_upsampled = resample(
+            df_minority,
+            replace=True,     # sample with replacement
+            n_samples=len(df_majority),    # to match majority class
+            random_state=42   # reproducible results
+        )
+
+        # Combine majority class with upsampled minority class
+        articles_balanced = pd.concat([df_majority, df_minority_upsampled])
+
+        # Shuffle the dataset
+        articles_balanced = articles_balanced.sample(
+            frac=1, random_state=42
+        ).reset_index(drop=True)
+
+        # Feature Engineering
+        current_year = datetime.now().year
+        articles_balanced['publication_age'] = current_year - articles_balanced['publication_year']
+
+        # Select relevant features
+        features = articles_balanced[[
+            'publication_age',
             'delta_citations',
             'journal_h_index',
             'mean_citations_per_paper',
@@ -43,39 +91,99 @@ class RankModel:
             'num_authors',
             'avg_author_h_index',
             'avg_author_total_papers',
-            'avg_author_total_citations',
-            'total_citations'
+            'avg_author_total_citations'
         ]]
-        target = articles['influential_citations']  # Assuming total citations as impact
+        target = articles_balanced['is_influential']
 
         # Handle missing values
-        features = features.fillna(0)
-        target = target.fillna(0)
+        features = features.fillna(features.mean())
 
-        # Split data into training and testing sets
-        from sklearn.model_selection import train_test_split
-        X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2, random_state=42)
+        # Feature scaling
+        scaler = StandardScaler()
+        features_scaled = scaler.fit_transform(features)
+        self.scaler = scaler
 
-        # Train a RandomForestRegressor model
-        model = RandomForestRegressor(n_estimators=100, random_state=42)
+        # ------------------ Part 2a: Check for Data Leakage ------------------
+
+        # Calculate correlation between features and target
+        correlation = features.apply(lambda x: x.corr(target))
+        print("Feature-Target Correlation:")
+        print(correlation.sort_values(ascending=False))
+
+        # Identify features with high correlation (absolute value > 0.8)
+        high_corr_features = correlation[correlation.abs() > 0.8].index.tolist()
+        print(f"Highly correlated features: {high_corr_features}")
+
+        # Remove highly correlated features to prevent data leakage
+        if high_corr_features:
+            print("Removing highly correlated features to prevent data leakage...")
+            features = features.drop(columns=high_corr_features)
+            # Re-scale features after dropping columns
+            features_scaled = scaler.fit_transform(features)
+            self.scaler = scaler
+
+        # ------------------ Part 2b: Validate Model Generalization ------------------
+
+        # Initialize the model
+        model = MLPClassifier(
+            hidden_layer_sizes=(64, 32),
+            activation='relu',
+            solver='adam',
+            max_iter=500,
+            random_state=42
+        )
+
+        # Perform cross-validation
+        cv_scores = cross_val_score(
+            model, features_scaled, target, cv=5, scoring='roc_auc'
+        )
+        print(f"Cross-Validated ROC AUC: {cv_scores.mean():.4f} (+/- {cv_scores.std():.4f})")
+
+        # Proceed to split data
+        X_train, X_test, y_train, y_test = train_test_split(
+            features_scaled, target, test_size=0.2, random_state=42, stratify=target
+        )
+
+        # Train the model
         model.fit(X_train, y_train)
 
-        # After training the model
-        feature_importances = model.feature_importances_
-        for name, importance in zip(features, feature_importances):
-            print(f"Feature: {name}, Importance: {importance}")
-
         # Evaluate the model
-        from sklearn.metrics import mean_squared_error
         y_pred = model.predict(X_test)
-        mse = mean_squared_error(y_test, y_pred)
-        print(f"Model Mean Squared Error: {mse}")
+        print("Classification Report:")
+        print(classification_report(y_test, y_pred))
+        print('ROC AUC Score:', roc_auc_score(y_test, model.predict_proba(X_test)[:, 1]))
 
-        # Save the trained model to a file
+        # Permutation Feature Importance
+        result = permutation_importance(
+            model, X_test, y_test, n_repeats=10, random_state=42
+        )
+        importance_df = pd.DataFrame({
+            'Feature': features.columns,
+            'Importance': result.importances_mean
+        })
+        print("Permutation Feature Importances:")
+        print(importance_df.sort_values(by='Importance', ascending=False))
+
+        # Save the model and scaler
+        with open('scaler.pkl', 'wb') as f:
+            pickle.dump(scaler, f)
         with open('ml_model.pkl', 'wb') as f:
             pickle.dump(model, f)
 
         return model
+
+    def get_influential_titles(self, filepath):
+        influential_titles = []
+        try:
+            with open(filepath, 'r') as file:
+                content = file.read()
+                # Extract titles using regex
+                titles = re.findall(r'title=\{(.+?)\},', content, re.DOTALL)
+                influential_titles = [title.strip().lower() for title in titles]
+            return set(influential_titles)
+        except FileNotFoundError:
+            print(f"File {filepath} not found.")
+            return set()
 
     def get_articles_from_db(self):
         # Fetch articles and related data from the database
@@ -134,9 +242,12 @@ class RankModel:
         cosine_scaler = MinMaxScaler()
         normalized_cosine_similarities = cosine_scaler.fit_transform(cosine_similarities).flatten()
 
-        # Use the ML model to predict impact scores
+        # Prepare features for prediction
+        current_year = datetime.now().year
+        articles['publication_age'] = current_year - articles['publication_year']
+
         features = articles[[
-            'publication_year',
+            'publication_age',
             'delta_citations',
             'journal_h_index',
             'mean_citations_per_paper',
@@ -144,10 +255,25 @@ class RankModel:
             'num_authors',
             'avg_author_h_index',
             'avg_author_total_papers',
-            'avg_author_total_citations',
-            'total_citations'
-        ]].fillna(0)
-        impact_scores = self.model.predict(features)
+            'avg_author_total_citations'
+        ]]
+
+        # Ensure consistency with training features
+        if hasattr(self.scaler, 'feature_names_in_'):
+            training_features = list(self.scaler.feature_names_in_)
+            features = features[training_features]
+
+        # Handle missing values
+        features = features.fillna(features.mean())
+
+        # Feature scaling
+        if self.scaler is None:
+            print("Scaler not found, cannot proceed.")
+            return pd.DataFrame()
+        features_scaled = self.scaler.transform(features)
+
+        # Predict impact scores using the trained classifier
+        impact_scores = self.model.predict_proba(features_scaled)[:, 1]
 
         # Normalize impact scores
         impact_scores = impact_scores.reshape(-1, 1)
