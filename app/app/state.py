@@ -25,6 +25,13 @@ CLIENT_ID = os.getenv('CLIENT_ID')
 
 # structure that holds the contents of the search results 
 class Article(rx.Base):
+    # title: str
+    # authors: str
+    # summary: str
+    # pdf_url: str
+    # published: str
+    # comment: str = ""
+    # journal_ref: str = ""
     title: str
     authors: str
     summary: str
@@ -32,6 +39,17 @@ class Article(rx.Base):
     published: str
     comment: str = ""
     journal_ref: str = ""
+    publication_year: int = 0
+    delta_citations: int = 0
+    journal_h_index: float = 0.0
+    mean_citations_per_paper: float = 0.0
+    total_papers_published: float = 0.0
+    num_authors: int = 0
+    avg_author_h_index: float = 0.0
+    avg_author_total_papers: float = 0.0
+    avg_author_total_citations: float = 0.0
+    total_citations: int = 0
+    impact_score: float = 0.0 
 
 
 class State(rx.State):
@@ -71,6 +89,7 @@ class State(rx.State):
     def logout(self):
         """Log the user out by clearing the ID token."""
         self.id_token_json = ""
+        self.clear_results()
         return rx.redirect("/")
 
     @rx.var
@@ -125,14 +144,34 @@ class State(rx.State):
             authors_str = ', '.join(authors_list) if authors_list else 'Unknown'
 
             # Create Article instance
+            # article = Article(
+            #     title=result['title'],
+            #     authors=authors_str,
+            #     summary=result['abstract'] or 'No abstract available.',
+            #     pdf_url=result['pdf_url'] or '#',
+            #     published=str(result['publication_year']) or 'Unknown',
+            #     comment="",  # You can update this if comments are available
+            #     journal_ref="",  # Update if journal references are available
+            # )
             article = Article(
                 title=result['title'],
                 authors=authors_str,
                 summary=result['abstract'] or 'No abstract available.',
                 pdf_url=result['pdf_url'] or '#',
                 published=str(result['publication_year']) or 'Unknown',
-                comment="",  # You can update this if comments are available
+                comment="",  # Update if comments are available
                 journal_ref="",  # Update if journal references are available
+                publication_year=int(result['publication_year']) if result['publication_year'] else 0,
+                delta_citations=int(result['delta_citations']) if result['delta_citations'] else 0,
+                journal_h_index = float(result['journal_h_index']) if result['journal_h_index'] else 0,
+                mean_citations_per_paper=float(result['mean_citations_per_paper']) if result['mean_citations_per_paper'] else 0.0,
+                total_papers_published=float(result['total_papers_published']) if result['total_papers_published'] else 0,
+                num_authors=int(result['num_authors']) if result['num_authors'] else 0,
+                avg_author_h_index=float(result['avg_author_h_index']) if result['avg_author_h_index'] else 0.0,
+                avg_author_total_papers=float(result['avg_author_total_papers']) if result['avg_author_total_papers'] else 0.0,
+                avg_author_total_citations=float(result['avg_author_total_citations']) if result['avg_author_total_citations'] else 0.0,
+                total_citations=int(result['total_citations']) if result['total_citations'] else 0,
+                impact_score=float(result['impact_score']) if result['impact_score'] else 0.0,  
             )
             self.results.append(article)
 
