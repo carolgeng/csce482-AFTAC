@@ -8,7 +8,7 @@ import hashlib
 # sys.path.append(project_root)
 
 from .DatabaseManager import DatabaseManager
-from APIs.semantic_scholar.semantic_scholar_wrapper import api_handler
+from ..APIs.semantic_scholar.semantic_scholar_wrapper import api_handler
 
 class SemanticScholarDbWrapper:
     def __init__(self):

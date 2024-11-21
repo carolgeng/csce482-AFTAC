@@ -10,7 +10,7 @@ import hashlib
 # sys.path.append(project_root)
 
 from .DatabaseManager import DatabaseManager
-from APIs.arXiv.arXiv_wrapper import api_handler
+from ..APIs.arXiv.arXiv_wrapper import api_handler
 
 class ArxivDbWrapper:
     def __init__(self):
