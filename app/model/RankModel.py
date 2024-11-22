@@ -155,6 +155,9 @@ class RankModel:
         impact_scaler = MinMaxScaler()
         normalized_impact_scores = impact_scaler.fit_transform(impact_scores).flatten()
 
+        print(f"Impact scores: {impact_scores[:10]}")
+
+
         # Combine the similarity and impact scores
         articles['cosine_sim'] = normalized_cosine_similarities
         articles['impact_score'] = normalized_impact_scores

@@ -33,7 +33,7 @@ def admin_page() -> rx.Component:
                 min="1"
             ),
             rx.button(
-                "Retrain",
+                "Add to database",
                 background_color="red",
                 on_click=State.populate_database,
                 margin_top="10px"

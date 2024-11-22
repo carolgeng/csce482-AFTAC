@@ -22,7 +22,7 @@ def user_info(self) -> rx.Component:
             # we can add AFTAC here
             (email != "") & ((email == "mev@tamu.edu") | (email == "sulaiman_1@tamu.edu") | (email == "sryeruva@tamu.edu") | (email == "alecklem@tamu.edu") ),  
             rx.button(
-                "Retrain Model",
+                "Populate Database",
                 on_click=lambda: rx.redirect("/admin"),  
                 background_color="red",
                 color="white",
