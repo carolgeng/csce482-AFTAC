@@ -17,15 +17,20 @@ def user_info(self) -> rx.Component:
     email = self.email 
     return rx.hstack(
         
-        rx.button("Logout", on_click=State.logout,background_color="grey",),
+        rx.button(
+            "Logout", 
+            on_click=State.logout,
+            disabled=State.is_searching,
+            background_color="grey"
+        ),
         rx.cond(
             # we can add AFTAC here
             (email != "") & ((email == "mev@tamu.edu") | (email == "sulaiman_1@tamu.edu") | (email == "sryeruva@tamu.edu") | (email == "alecklem@tamu.edu") ),  
             rx.button(
                 "Admin Page",
-                on_click=lambda: rx.redirect("/admin"),  
+                disabled=State.is_searching,
+                on_click=lambda: rx.redirect("/admin"),
                 background_color="red",
-                color="white",
                 padding="10px",
             ),
             rx.text(""),  

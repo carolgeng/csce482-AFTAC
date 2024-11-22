@@ -35,20 +35,27 @@ def admin_page() -> rx.Component:
             rx.hstack(
                 rx.button(
                     "Populate Database",
+                    rx.spinner(loading=State.is_populating),
+                    disabled=State.is_busy,
                     background_color="blue",
+                    color=State.populate_button_color,
                     on_click=State.populate_database,
                     margin_top="10px"
                 ),
                 rx.button(
                     "Retrain Model",
+                    rx.spinner(loading=State.is_training),
+                    disabled=State.is_busy,
                     background_color="green",
+                    color=State.retrain_button_color,
                     on_click=State.retrain_model,
                     margin_top="10px"
-                )
+                ),
             ),
             rx.hstack(
                 rx.button(
                     "Back",
+                    disabled=State.is_busy,
                     background_color="red",
                     on_click=rx.redirect("/user"),
                     margin_top="10px"

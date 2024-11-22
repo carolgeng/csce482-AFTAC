@@ -38,23 +38,27 @@ def user_page() -> rx.Component:
                 ),
                 rx.button(
                     "Search",
+                    rx.spinner(loading=State.is_searching),
+                    disabled=State.is_searching,
                     on_click=State.search_articles,
                     background_color="blue",
+                    color="white",
                     padding="10px"
                 ),
-                spacing="3",
             ),
 
             rx.hstack(
                  rx.button(
                     "Clear Results",
                     on_click=State.clear_results,
+                    disabled=State.is_searching,
                     background_color="blue",
                     margin_top="10px"
                 ),
                 rx.button(
                     "Export to CSV",
                     on_click=State.export_results_to_csv,
+                    disabled=State.is_searching,
                     background_color="blue",
                     margin_top="10px"
                 ),
@@ -65,19 +69,22 @@ def user_page() -> rx.Component:
                  rx.button(
                     "Sort by citation count",
                     #on_click=State.clear_results,
-                    background_color="green",
+                    disabled=State.is_searching,
+                    background_color="blue",
                     margin_top="10px"
                 ),
                 rx.button(
                     "Sort by date",
                     #on_click=State.export_results_to_csv,
-                    background_color="green",
+                    disabled=State.is_searching,
+                    background_color="blue",
                     margin_top="10px"
                 ),
                 rx.button(
                     "Sort by impact score",
                     #on_click=State.export_results_to_csv,
-                    background_color="green",
+                    disabled=State.is_searching,
+                    background_color="blue",
                     margin_top="10px"
                 ),
             ),
