@@ -65,19 +65,19 @@ def user_page() -> rx.Component:
                  rx.button(
                     "Sort by citation count",
                     #on_click=State.clear_results,
-                    background_color="blue",
+                    background_color="green",
                     margin_top="10px"
                 ),
                 rx.button(
                     "Sort by date",
                     #on_click=State.export_results_to_csv,
-                    background_color="blue",
+                    background_color="green",
                     margin_top="10px"
                 ),
                 rx.button(
                     "Sort by impact score",
                     #on_click=State.export_results_to_csv,
-                    background_color="blue",
+                    background_color="green",
                     margin_top="10px"
                 ),
             ),
@@ -98,49 +98,18 @@ def user_page() -> rx.Component:
                             rx.text(result.published),
                             spacing="1",
                         ),
-                        rx.hstack(
-                            rx.text("Publication Year: ", font_weight="bold"),
-                            rx.text(str(result.publication_year)),
-                        ),
-                        rx.hstack(
-                            rx.text("Delta Citations: ", font_weight="bold"),
-                            rx.text(str(result.delta_citations)),
-                        ),
-                        rx.hstack(
-                            rx.text("Journal H-Index: ", font_weight="bold"),
-                            rx.text(str(result.journal_h_index)),
-                        ),
-                        rx.hstack(
-                            rx.text("Mean Citations per Paper: ", font_weight="bold"),
-                            rx.text(f"{result.mean_citations_per_paper:.2f}"),
-                        ),
-                        rx.hstack(
-                            rx.text("Total Papers Published: ", font_weight="bold"),
-                            rx.text(str(result.total_papers_published)),
-                        ),
-                        rx.hstack(
-                            rx.text("Number of Authors: ", font_weight="bold"),
-                            rx.text(str(result.num_authors)),
-                        ),
-                        rx.hstack(
-                            rx.text("Avg Author H-Index: ", font_weight="bold"),
-                            rx.text(f"{result.avg_author_h_index:.2f}"),
-                        ),
-                        rx.hstack(
-                            rx.text("Avg Author Total Papers: ", font_weight="bold"),
-                            rx.text(f"{result.avg_author_total_papers:.2f}"),
-                        ),
-                        rx.hstack(
-                            rx.text("Avg Author Total Citations: ", font_weight="bold"),
-                            rx.text(f"{result.avg_author_total_citations:.2f}"),
-                        ),
-                        rx.hstack(
-                            rx.text("Total Citations: ", font_weight="bold"),
-                            rx.text(str(result.total_citations)),
-                        ),
-                        rx.hstack(
-                            rx.text("Impact Score: ", font_weight="bold"),
-                            rx.text(f"{result.impact_score:.2f}"),
+                        rx.cond(
+                            result.journal_ref != "",
+                            rx.hstack(
+                                rx.text("Journal Reference: ", font_weight="bold"),
+                                rx.text(result.journal_ref),
+                                spacing="1",
+                            ),
+                            rx.hstack(
+                                rx.text("Journal Reference: ", font_weight="bold"),
+                                rx.text("No journal reference"),
+                                spacing="1",
+                            )
                         ),
                         rx.text(result.summary),
                         rx.link(

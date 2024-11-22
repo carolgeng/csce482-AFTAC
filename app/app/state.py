@@ -30,19 +30,7 @@ class Article(rx.Base):
     summary: str
     pdf_url: str
     published: str
-    comment: str = ""
     journal_ref: str = ""
-    publication_year: int = 0
-    delta_citations: float = 0
-    journal_h_index: float = 0.0
-    mean_citations_per_paper: float = 0.0
-    total_papers_published: float = 0.0
-    num_authors: int = 0
-    avg_author_h_index: float = 0.0
-    avg_author_total_papers: float = 0.0
-    avg_author_total_citations: float = 0.0
-    total_citations: int = 0
-    impact_score: float = 0.0 
 
 
 class State(rx.State):
@@ -130,6 +118,12 @@ class State(rx.State):
         if ranked_articles.empty:
             print("No articles found for the given query.")
             return
+        
+        # # Convert published to string
+        # published_str = result.published.strftime('%Y-%m-%d %H:%M:%S') if result.published else ''
+
+        # # Ensure journal_ref is a string
+        # journal_ref = getattr(result, 'journal_ref', '') or ''
 
         for _, result in ranked_articles.iterrows():
             # Filter out None values in authors
@@ -142,19 +136,7 @@ class State(rx.State):
                 summary=result['abstract'] or 'No abstract available.',
                 pdf_url=result['pdf_url'] or '#',
                 published=str(result['publication_year']) or 'Unknown',
-                comment="",  # Update if comments are available
                 journal_ref="",  # Update if journal references are available
-                publication_year=int(result['publication_year']) if result['publication_year'] else 0,
-                delta_citations=float(result['delta_citations']) if result['delta_citations'] else 0,
-                journal_h_index = float(result['journal_h_index']) if result['journal_h_index'] else 0,
-                mean_citations_per_paper=float(result['mean_citations_per_paper']) if result['mean_citations_per_paper'] else 0.0,
-                total_papers_published=float(result['total_papers_published']) if result['total_papers_published'] else 0,
-                num_authors=int(result['num_authors']) if result['num_authors'] else 0,
-                avg_author_h_index=float(result['avg_author_h_index']) if result['avg_author_h_index'] else 0.0,
-                avg_author_total_papers=float(result['avg_author_total_papers']) if result['avg_author_total_papers'] else 0.0,
-                avg_author_total_citations=float(result['avg_author_total_citations']) if result['avg_author_total_citations'] else 0.0,
-                total_citations=int(result['total_citations']) if result['total_citations'] else 0,
-                impact_score=float(result['impact_score']) if result['impact_score'] else 0.0,  
             )
             self.results.append(article)
 
@@ -162,7 +144,7 @@ class State(rx.State):
         """Clear the search results and reset input fields."""
         self.results = []
         self.keywords = ""
-        self.num_articles = "10"
+        self.num_articles = ""
 
     @rx.event
     def export_results_to_csv(self):

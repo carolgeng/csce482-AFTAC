@@ -71,19 +71,6 @@ def admin_page() -> rx.Component:
                             spacing="1",
                         ),
                         rx.cond(
-                            result.comment != "",
-                            rx.hstack(
-                                rx.text("Comments: ", font_weight="bold"),
-                                rx.text(result.comment),
-                                spacing="1",
-                            ),
-                            rx.hstack(
-                                rx.text("Comments: ", font_weight="bold"),
-                                rx.text("No comments"),
-                                spacing="1",
-                            )
-                        ),
-                        rx.cond(
                             result.journal_ref != "",
                             rx.hstack(
                                 rx.text("Journal Reference: ", font_weight="bold"),
