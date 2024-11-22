@@ -50,11 +50,19 @@ class State(rx.State):
     # for oauth use token instead of goole client secret 
     id_token_json: str = rx.LocalStorage()
 
+    is_searching: bool = False
+    is_populating: bool = False
+    is_training: bool = False
+
+    @rx.var
+    def is_busy(self) -> bool:
+        """Returns True if the system is currently searching or training."""
+        return self.is_populating or self.is_training
+
     def on_success(self, id_token: dict):
         """Handle successful login and store the ID token."""
         self.id_token_json = json.dumps(id_token)
         return rx.redirect("/user")
-
 
     @rx.var(cache=True)
     def email(self) -> str:
@@ -113,8 +121,11 @@ class State(rx.State):
         """Set the number of articles."""
         self.num_articles = value
 
-    def search_articles(self):
+    @rx.event(background=True)
+    async def search_articles(self):
         """Function to handle article search and ranking."""
+        async with self:
+            self.is_searching = True
         try:
             num_articles_int = int(self.num_articles)
         except ValueError:
@@ -122,13 +133,16 @@ class State(rx.State):
 
         rank_model = RankModel()
         # Get ranked articles from the model
+        # ranked_articles = await rx.run_in_thread(rank_model.rank_articles, self.keywords, num_articles=num_articles_int)
         ranked_articles = rank_model.rank_articles(self.keywords, num_articles=num_articles_int)
-
-        # Initialize an empty list to store articles
-        self.results = []
+        # Build up a new list to store articles
+        new_results = []
 
         if ranked_articles.empty:
             print("No articles found for the given query.")
+            async with self:
+                self.results = []
+                self.is_searching = False
             return
 
         for _, result in ranked_articles.iterrows():
@@ -156,13 +170,30 @@ class State(rx.State):
                 total_citations=int(result['total_citations']) if result['total_citations'] else 0,
                 impact_score=float(result['impact_score']) if result['impact_score'] else 0.0,  
             )
-            self.results.append(article)
+            new_results.append(article)
+            # Update the results and is_searching flag inside async with self
+            async with self:
+                self.results = new_results
+                self.is_searching = False
 
-    def clear_results(self):
-        """Clear the search results and reset input fields."""
-        self.results = []
-        self.keywords = ""
-        self.num_articles = "10"
+    @rx.event(background=True)
+    async def populate_database(self):
+        try:
+            num_articles_int = int(self.num_articles)
+        except ValueError:
+            num_articles_int = 10  # Default or handle error
+
+        # Initialize the DatabaseSearchService with the query (keywords) and number of articles
+        search_service = DatabaseSearchService(query=self.keywords, num_articles=num_articles_int)
+
+        # Run the search and store the results in the databases
+        await rx.run_in_thread(search_service.search_and_store)
+
+        print(f"Database populated with {num_articles_int} articles for query '{self.keywords}'.")
+
+        # Optionally clear results or reset fields after population
+        async with self:
+            self.clear_results()
 
     @rx.event
     def export_results_to_csv(self):
@@ -194,7 +225,12 @@ class State(rx.State):
             filename=filename,
         )
     
-    def populate_database(self):
+    @rx.event(background=True)
+    async def populate_database(self):
+
+        async with self:
+            self.is_populating = True
+
         try:
             num_articles_int = int(self.num_articles)
         except ValueError:
@@ -207,8 +243,35 @@ class State(rx.State):
 
         print(f"Database populated with {num_articles_int} articles for query '{self.keywords}'.")
 
-        # Optionally clear results or reset fields after population
-        self.clear_results()
+          
 
-    def retrain_model(self):
+        async with self:
+            # Optionally clear results or reset fields after population  
+            self.clear_results()
+            self.is_populating = False
+
+    @rx.event(background=True)
+    async def retrain_model(self):
+        async with self:
+            self.is_training = True
+
         RankModel().train_ml_model()
+
+        async with self:
+            self.is_training = False
+
+    def clear_results(self):
+        """Clear the search results and reset input fields."""
+        self.results = []
+        self.keywords = ""
+        self.num_articles = "10"
+
+    @rx.var
+    def populate_button_color(self):
+        """Returns 'white' when populating is in progress."""
+        return "white" if self.is_populating else None
+
+    @rx.var
+    def retrain_button_color(self):
+        """Returns 'white' when training is in progress."""
+        return "white" if self.is_training else None
