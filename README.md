@@ -109,11 +109,6 @@ For any inquiries or further development, contact one of the developers listed a
 
 ---
 
-## CI/CD  
-
-Our CI/CD pipeline ensures rigorous testing and integration. GitHub Actions workflows can be found in the repository.  
-
----
 
 ## References  
 
