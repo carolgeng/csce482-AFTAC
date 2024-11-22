@@ -11,7 +11,15 @@ This application is the Fall 2024 capstone project of:
 
 ## Introduction  
 
-This project is a pure Python application built using the Reflex framework. It incorporates Google OAuth for authentication, with special admin privileges available for tasks such as repopulating the database and retraining the model. To gain admin access, contact one of the developers listed above.  
+This project is a pure Python application built using the Reflex framework. Its primary purpose is to facilitate research and development by employing a machine learning/AI algorithm that ranks the impact of academic articles. The algorithm uses article metadata as metrics to determine the impact score of each article.
+
+Users can interact with the application by:
+
+Querying articles using keywords.
+Specifying the number of articles to include in the ranking.
+The application will then display the ranked articles as results on the screen, enabling users to efficiently assess the relevance and impact of the available research.
+
+The app incorporates Google OAuth for authentication, with special admin privileges available for tasks such as repopulating the database and retraining the model. To gain admin access, contact one of the developers listed above.  
 
 ---
 
