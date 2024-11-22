@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from app.database.open_alex_db_wrapper import OpenAlexDbWrapper
 from app.database.DatabaseManager import DatabaseManager
-from app.APIs.open_alex.open_alex_wrapper import openalex_api_handler
+from app.database.APIs.open_alex.open_alex_wrapper import openalex_api_handler
 
 @pytest.fixture
 def openalex_wrapper():

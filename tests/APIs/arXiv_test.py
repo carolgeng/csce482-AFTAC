@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from app.APIs.arXiv.arXiv_wrapper import api_handler
+from app.database.APIs.arXiv.arXiv_wrapper import api_handler
 from arxiv import UnexpectedEmptyPageError
 
 @pytest.fixture

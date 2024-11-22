@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from app.database.crossref_db_wrapper import CrossRefDbWrapper
 from app.database.DatabaseManager import DatabaseManager
-from app.APIs.crossref.crossref_wrapper import api_handler
+from app.database.APIs.crossref.crossref_wrapper import api_handler
 
 @pytest.fixture
 def crossref_wrapper():

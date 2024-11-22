@@ -13,7 +13,7 @@ from io import StringIO
 
 # for article serach app
 import reflex as rx
-from APIs.arXiv.arXiv_wrapper import api_handler
+from database.APIs.arXiv.arXiv_wrapper import api_handler
 from datetime import datetime
 from model.RankModel import RankModel
 from database.populate_db import DatabaseSearchService

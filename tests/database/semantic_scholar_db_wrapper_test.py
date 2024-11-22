@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from app.database.semantic_scholar_db_wrapper import SemanticScholarDbWrapper
 from app.database.DatabaseManager import DatabaseManager
-from app.APIs.semantic_scholar.semantic_scholar_wrapper import api_handler
+from app.database.APIs.semantic_scholar.semantic_scholar_wrapper import api_handler
 
 @pytest.fixture
 def semantic_scholar_wrapper():
