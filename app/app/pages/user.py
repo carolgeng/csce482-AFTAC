@@ -70,21 +70,21 @@ def user_page() -> rx.Component:
                     "Sort by citation count",
                     #on_click=State.clear_results,
                     disabled=State.is_searching,
-                    background_color="blue",
+                    background_color="green",
                     margin_top="10px"
                 ),
                 rx.button(
                     "Sort by date",
                     #on_click=State.export_results_to_csv,
                     disabled=State.is_searching,
-                    background_color="blue",
+                    background_color="green",
                     margin_top="10px"
                 ),
                 rx.button(
                     "Sort by impact score",
                     #on_click=State.export_results_to_csv,
                     disabled=State.is_searching,
-                    background_color="blue",
+                    background_color="green",
                     margin_top="10px"
                 ),
             ),

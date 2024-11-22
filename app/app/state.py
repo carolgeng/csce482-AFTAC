@@ -31,6 +31,8 @@ class Article(rx.Base):
     pdf_url: str
     published: str
     journal_ref: str = ""
+    cit_count: int = 0 
+    im_score: float = 0.0
 
 
 class State(rx.State):
