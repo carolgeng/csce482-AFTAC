@@ -3,7 +3,7 @@
 import sys
 import requests
 from .DatabaseManager import DatabaseManager
-from ..APIs.open_alex.open_alex_wrapper import OpenAlexAPIHandler
+from .APIs.open_alex.open_alex_wrapper import OpenAlexAPIHandler
 
 class OpenAlexDbWrapper:
     def __init__(self):
@@ -30,7 +30,7 @@ class OpenAlexDbWrapper:
 
                 try:
                     # Extract necessary fields from the OpenAlex work
-                    paper_openalex_id = result.get('id', '')
+                    paper_openalex_id = result.get('id', '').replace('https://openalex.org/', '')
                     title = result.get('title', 'No Title')
 
                     abstract_inverted_index = result.get('abstract_inverted_index', None)
@@ -38,6 +38,9 @@ class OpenAlexDbWrapper:
 
                     publication_year = result.get('publication_year', None)
                     doi = result.get('doi', None)
+                    if not doi and not paper_openalex_id:
+                        print(f"Paper '{title}' has no DOI or OpenAlex ID. Skipping.")
+                        continue
                     pdf_url = result.get('primary_location', {}).get('pdf_url', None)
 
                     # Insert paper information into the database

@@ -32,6 +32,25 @@ class DatabaseManager:
 
         update_columns = [col for col in columns if col != 'openalex_id']
 
+        # Define which fields are strings
+        string_fields = ['openalex_id', 'name']
+
+        update_statements = []
+        for field in update_columns:
+            if field in string_fields:
+                condition = sql.SQL("authors.{field} IS NULL OR authors.{field} = ''").format(
+                    field=sql.Identifier(field)
+                )
+            else:
+                condition = sql.SQL("authors.{field} IS NULL OR authors.{field} = 0").format(
+                    field=sql.Identifier(field)
+                )
+            update_statement = sql.SQL("{field} = CASE WHEN {condition} THEN EXCLUDED.{field} ELSE authors.{field} END").format(
+                field=sql.Identifier(field),
+                condition=condition
+            )
+            update_statements.append(update_statement)
+
         insert_query = sql.SQL("""
             INSERT INTO authors ({fields})
             VALUES ({placeholders})
@@ -42,11 +61,7 @@ class DatabaseManager:
         """).format(
             fields=sql.SQL(', ').join(map(sql.Identifier, columns)),
             placeholders=sql.SQL(', ').join(sql.Placeholder() * len(columns)),
-            updates=sql.SQL(', ').join([
-                sql.SQL("{field} = CASE WHEN authors.{field} IS NULL OR authors.{field} = 0 THEN EXCLUDED.{field} ELSE authors.{field} END").format(
-                    field=sql.Identifier(field)
-                ) for field in update_columns
-            ])
+            updates=sql.SQL(', ').join(update_statements)
         )
 
         try:
@@ -57,6 +72,7 @@ class DatabaseManager:
         except psycopg2.Error as e:
             print(f"Error inserting/updating author '{name}': {e}")
             return None
+
 
     def insert_journal(self, journal_name, **kwargs):
         """
@@ -99,21 +115,50 @@ class DatabaseManager:
     def insert_paper(self, openalex_id, title, **kwargs):
         """
         Insert or update a paper in the database.
-        Upsert is based on 'doi' if available; otherwise, 'openalex_id'.
+        Upsert is based on 'doi' if available and non-empty; otherwise, 'openalex_id' if available and non-empty.
+        If neither is available, skip inserting the paper.
         Only updates fields that are null or placeholders.
         Returns the paper's id.
         """
-        if kwargs.get('doi'):
+        doi = kwargs.get('doi')
+        doi = doi.strip() if doi else None
+
+        openalex_id = openalex_id.strip() if openalex_id else None
+
+        if doi:
             unique_key = 'doi'
-            unique_value = kwargs.get('doi')
-        else:
+            unique_value = doi
+        elif openalex_id:
             unique_key = 'openalex_id'
             unique_value = openalex_id
+        else:
+            # Neither DOI nor OpenAlex ID is available
+            print(f"Cannot insert/update paper '{title}' without 'doi' or 'openalex_id'. Skipping.")
+            return None
 
         columns = ['openalex_id', 'title'] + list(kwargs.keys())
         values = [openalex_id, title] + list(kwargs.values())
 
         update_columns = [col for col in columns if col != unique_key]
+
+        # Define which fields are strings
+        string_fields = ['openalex_id', 'title', 'abstract', 'pdf_url', 'doi']
+
+        update_statements = []
+        for field in update_columns:
+            if field in string_fields:
+                condition = sql.SQL("papers.{field} IS NULL OR papers.{field} = ''").format(
+                    field=sql.Identifier(field)
+                )
+            else:
+                condition = sql.SQL("papers.{field} IS NULL OR papers.{field} = 0").format(
+                    field=sql.Identifier(field)
+                )
+            update_statement = sql.SQL("{field} = CASE WHEN {condition} THEN EXCLUDED.{field} ELSE papers.{field} END").format(
+                field=sql.Identifier(field),
+                condition=condition
+            )
+            update_statements.append(update_statement)
 
         insert_query = sql.SQL("""
             INSERT INTO papers ({fields})
@@ -126,11 +171,7 @@ class DatabaseManager:
             fields=sql.SQL(', ').join(map(sql.Identifier, columns)),
             placeholders=sql.SQL(', ').join(sql.Placeholder() * len(columns)),
             unique_key=sql.Identifier(unique_key),
-            updates=sql.SQL(', ').join([
-                sql.SQL("{field} = CASE WHEN papers.{field} IS NULL OR papers.{field} = 0 THEN EXCLUDED.{field} ELSE papers.{field} END").format(
-                    field=sql.Identifier(field)
-                ) for field in update_columns
-            ])
+            updates=sql.SQL(', ').join(update_statements)
         )
 
         try:
@@ -141,6 +182,7 @@ class DatabaseManager:
         except psycopg2.Error as e:
             print(f"Error inserting/updating paper '{title}': {e}")
             return None
+
 
     def insert_concept(self, openalex_id, name, **kwargs):
         """
