@@ -21,7 +21,8 @@ If you'd like to contribute, please follow these instructions.
 
 ### Fork and Clone  
 
-1. [Fork this repo on GitHub](https://github.com/twitter/opensource-website/fork).  
+1. [Fork this repo on GitHub](git clone https://github.com/your-repo-name.git
+cd your-repo-name).  
 2. Clone your fork:  
 
 ```bash
