@@ -25,13 +25,6 @@ CLIENT_ID = os.getenv('CLIENT_ID')
 
 # structure that holds the contents of the search results 
 class Article(rx.Base):
-    # title: str
-    # authors: str
-    # summary: str
-    # pdf_url: str
-    # published: str
-    # comment: str = ""
-    # journal_ref: str = ""
     title: str
     authors: str
     summary: str
@@ -143,16 +136,6 @@ class State(rx.State):
             authors_list = [a for a in result['authors'] if a] if result['authors'] else []
             authors_str = ', '.join(authors_list) if authors_list else 'Unknown'
 
-            # Create Article instance
-            # article = Article(
-            #     title=result['title'],
-            #     authors=authors_str,
-            #     summary=result['abstract'] or 'No abstract available.',
-            #     pdf_url=result['pdf_url'] or '#',
-            #     published=str(result['publication_year']) or 'Unknown',
-            #     comment="",  # You can update this if comments are available
-            #     journal_ref="",  # Update if journal references are available
-            # )
             article = Article(
                 title=result['title'],
                 authors=authors_str,
@@ -226,3 +209,6 @@ class State(rx.State):
 
         # Optionally clear results or reset fields after population
         self.clear_results()
+
+    def retrain_model(self):
+        RankModel().train_ml_model()

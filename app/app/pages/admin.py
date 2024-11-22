@@ -32,19 +32,27 @@ def admin_page() -> rx.Component:
                 type_="number",
                 min="1"
             ),
-            rx.button(
-                "Add to database",
-                background_color="red",
-                on_click=State.populate_database,
-                margin_top="10px"
+            rx.hstack(
+                rx.button(
+                    "Populate Database",
+                    background_color="blue",
+                    on_click=State.populate_database,
+                    margin_top="10px"
+                ),
+                rx.button(
+                    "Retrain Model",
+                    background_color="green",
+                    on_click=State.retrain_model,
+                    margin_top="10px"
+                )
             ),
             rx.hstack(
                 rx.button(
                     "Back",
+                    background_color="red",
                     on_click=rx.redirect("/user"),
                     margin_top="10px"
                 ),
-        
             ),
             # Display results
             rx.vstack(
