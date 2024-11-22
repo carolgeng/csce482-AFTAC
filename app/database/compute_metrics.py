@@ -4,10 +4,9 @@ import sys
 import datetime
 import logging
 import traceback
-from .DatabaseManager import DatabaseManager
 from sqlalchemy import create_engine, func, desc
 from sqlalchemy.orm import sessionmaker, scoped_session
-from .models import Base, Paper, Author, Journal, Citation, PaperAuthor, Concept, PaperConcept
+from ..models import Base, Paper, Author, Journal, Citation, PaperAuthor, Concept, PaperConcept
 from dotenv import load_dotenv
 import os
 import networkx as nx
@@ -50,9 +49,12 @@ def compute_author_metrics(session):
 
             # Get all papers authored
             papers = session.query(Paper).join(PaperAuthor).filter(PaperAuthor.author_id == author.id).all()
-            paper_ids = [paper.id for paper in papers]
             total_papers = len(papers)
             author.total_papers = total_papers
+
+            # Calculate delta_total_papers (change in total_papers)
+            # For simplicity, we'll assume delta is zero since we don't have historical data
+            author.delta_total_papers = 0  # Update this as needed
 
             if total_papers == 0:
                 continue  # Skip authors with no papers
@@ -77,6 +79,10 @@ def compute_author_metrics(session):
                     h_index = i
                 else:
                     break
+
+            # Calculate delta_h_index (change in h_index)
+            previous_h_index = author.h_index or 0
+            author.delta_h_index = h_index - previous_h_index
             author.h_index = h_index
 
             # Author age
@@ -195,7 +201,9 @@ def compute_journal_metrics(session):
 
             papers = session.query(Paper).filter(Paper.journal_id == journal.id).all()
             total_papers = len(papers)
+            previous_total_papers = journal.total_papers_published or 0
             journal.total_papers_published = total_papers
+            journal.delta_total_papers_published = total_papers - previous_total_papers
 
             if total_papers == 0:
                 continue  # Skip journals with no papers
@@ -203,6 +211,10 @@ def compute_journal_metrics(session):
             # Mean citations per paper
             total_citations = sum(paper.total_citations or 0 for paper in papers)
             journal.mean_citations_per_paper = total_citations / total_papers
+
+            # Delta mean citations per paper (change since last computation)
+            previous_mean_citations = journal.mean_citations_per_paper or 0
+            journal.delta_mean_citations_per_paper = journal.mean_citations_per_paper - previous_mean_citations
 
             # Maximum citations per paper
             max_citations = max(paper.total_citations or 0 for paper in papers)
@@ -216,6 +228,10 @@ def compute_journal_metrics(session):
                     h_index = i
                 else:
                     break
+
+            # Delta journal h-index
+            previous_h_index = journal.journal_h_index or 0
+            journal.delta_journal_h_index = h_index - previous_h_index
             journal.journal_h_index = h_index
 
             # Save changes
