@@ -1,6 +1,3 @@
-Here’s the full updated README document with all the requested changes:  
-
----
 
 # Fall 2024 Capstone Project  
 
