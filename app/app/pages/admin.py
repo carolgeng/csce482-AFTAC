@@ -13,7 +13,7 @@ def admin_page() -> rx.Component:
         rx.vstack(
             rx.heading("AFTAC: AI Driven R&D", size="2xl"),
             rx.text(
-                "Enter keywords to find relevant articles.",
+                "Enter keywords to populate the database.",
                 font_size="lg"
             ),
             # Input box for keyword search

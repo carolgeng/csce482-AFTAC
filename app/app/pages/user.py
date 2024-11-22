@@ -16,7 +16,7 @@ def user_page() -> rx.Component:
             user_info(State.tokeninfo),
             rx.heading("AFTAC: AI Driven R&D", size="2xl"),
             rx.text(
-                "Enter keywords to find relevant articles.",
+                "Enter keywords to find relevant research papers.",
                 font_size="lg"
             ),
             # Input box for keyword search
@@ -60,6 +60,28 @@ def user_page() -> rx.Component:
                 ),
                 spacing="1"
             ),
+
+            rx.hstack(
+                 rx.button(
+                    "Sort by citation count",
+                    #on_click=State.clear_results,
+                    background_color="blue",
+                    margin_top="10px"
+                ),
+                rx.button(
+                    "Sort by date",
+                    #on_click=State.export_results_to_csv,
+                    background_color="blue",
+                    margin_top="10px"
+                ),
+                rx.button(
+                    "Sort by impact score",
+                    #on_click=State.export_results_to_csv,
+                    background_color="blue",
+                    margin_top="10px"
+                ),
+            ),
+            
             # Display results
             rx.vstack(
                 rx.foreach(
