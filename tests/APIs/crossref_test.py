@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from app.APIs.crossref.crossref_wrapper import api_handler
+from app.database.APIs.crossref.crossref_wrapper import api_handler
 import requests
 
 @pytest.fixture

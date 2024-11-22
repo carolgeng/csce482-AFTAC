@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from app.APIs.semantic_scholar.semantic_scholar_wrapper import api_handler
+from app.database.APIs.semantic_scholar.semantic_scholar_wrapper import api_handler
 import requests
 import os
 from dotenv import load_dotenv

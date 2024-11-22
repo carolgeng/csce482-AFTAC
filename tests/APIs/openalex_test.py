@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from app.APIs.open_alex.open_alex_wrapper import openalex_api_handler
+from app.database.APIs.open_alex.open_alex_wrapper import openalex_api_handler
 import requests
 
 @pytest.fixture
