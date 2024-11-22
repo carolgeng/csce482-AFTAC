@@ -10,7 +10,7 @@ import hashlib
 # sys.path.append(project_root)
 
 from .DatabaseManager import DatabaseManager
-from ..APIs.crossref.crossref_wrapper import api_handler
+from APIs.crossref.crossref_wrapper import api_handler
 class CrossRefDbWrapper:
     def __init__(self):
         self.api_handler = api_handler()

@@ -10,7 +10,7 @@ import hashlib
 # sys.path.append(project_root)
 
 from .DatabaseManager import DatabaseManager
-from ..APIs.open_alex.open_alex_wrapper import openalex_api_handler  # Ensure the correct path
+from APIs.open_alex.open_alex_wrapper import openalex_api_handler  # Ensure the correct path
 
 class OpenAlexDbWrapper:
     def __init__(self):

@@ -7,7 +7,7 @@ from datetime import datetime
 from sklearn.neural_network import MLPClassifier  # Using classifier instead of regressor
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from ..database.DatabaseManager import DatabaseManager
+from database.DatabaseManager import DatabaseManager
 from dotenv import load_dotenv
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.model_selection import train_test_split, cross_val_score

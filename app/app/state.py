@@ -40,7 +40,7 @@ class Article(rx.Base):
     comment: str = ""
     journal_ref: str = ""
     publication_year: int = 0
-    delta_citations: int = 0
+    delta_citations: float = 0
     journal_h_index: float = 0.0
     mean_citations_per_paper: float = 0.0
     total_papers_published: float = 0.0
@@ -162,7 +162,7 @@ class State(rx.State):
                 comment="",  # Update if comments are available
                 journal_ref="",  # Update if journal references are available
                 publication_year=int(result['publication_year']) if result['publication_year'] else 0,
-                delta_citations=int(result['delta_citations']) if result['delta_citations'] else 0,
+                delta_citations=float(result['delta_citations']) if result['delta_citations'] else 0,
                 journal_h_index = float(result['journal_h_index']) if result['journal_h_index'] else 0,
                 mean_citations_per_paper=float(result['mean_citations_per_paper']) if result['mean_citations_per_paper'] else 0.0,
                 total_papers_published=float(result['total_papers_published']) if result['total_papers_published'] else 0,
@@ -192,7 +192,7 @@ class State(rx.State):
         writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL) # for nicer formatting
         
         # header
-        writer.writerow(["Title", "Authors", "Published"])
+        writer.writerow(["Title", "Authors", "Published", "PDF link"])
         
         # data
         for article in self.results:
@@ -200,6 +200,7 @@ class State(rx.State):
                 article.title,
                 article.authors,
                 article.published,
+                article.pdf_url
             ])
         
         output.seek(0)
