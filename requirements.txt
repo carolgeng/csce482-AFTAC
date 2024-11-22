@@ -1,0 +1,29 @@
+# APIs
+arxiv
+requests==2.26.0
+
+# Database
+psycopg2-binary
+python-dotenv==0.19.2
+
+# GUI
+reflex
+
+# Testing
+pytest
+pytest-cov
+
+#auth
+google-auth
+google-auth-oauthlib
+google-auth[requests]
+
+
+# env
+python-dotenv
+
+# model
+pandas
+scikit-learn
+numpy
+pickle-mixin

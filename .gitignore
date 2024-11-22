@@ -1,0 +1,12 @@
+# Ignore all __pycache__ directories
+**/__pycache__/
+**/htmlcov/
+
+# Ignore virtual environment directories
+venv/
+
+*.sqlite
+*.db
+.env
+.coverage
+*.pyc
