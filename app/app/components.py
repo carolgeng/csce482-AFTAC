@@ -1,17 +1,19 @@
+import os
+import functools
 import reflex as rx
+from dotenv import load_dotenv
+
 from .state import State
 from .react_oauth_google import (
     GoogleOAuthProvider,
     GoogleLogin,
 )
-import functools
-from dotenv import load_dotenv
-import os
 
 # gets client id from env file
 load_dotenv()
 CLIENT_ID = os.getenv('CLIENT_ID')
 
+# Google OAUTH components
 def user_info(self) -> rx.Component:
     """Display the user's information, including avatar and email."""
     email = self.email 
@@ -38,13 +40,11 @@ def user_info(self) -> rx.Component:
         padding="10px",
     )
 
-
 def login() -> rx.Component:
     """Display the Google Login button."""
     return rx.vstack(
         GoogleLogin.create(on_success=State.on_success),
     )
-
 
 def require_google_login(page) -> rx.Component:
     """Ensure that the user is logged in before accessing the page."""
@@ -62,3 +62,5 @@ def require_google_login(page) -> rx.Component:
         )
 
     return _auth_wrapper
+
+# UI Components
