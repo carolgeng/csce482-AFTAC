@@ -54,18 +54,21 @@ class State(rx.State):
         except ValueError:
             return rx.toast.warning("Number of articles must be an integer.")
 
-    def set_keywords(self, value):
+    @rx.event()
+    def set_keywords(self, value: str):
         """Set the search keywords."""
         self.keywords = value
 
-    def set_num_articles(self, value):
+    @rx.event()
+    def set_num_articles(self, value: str):
         """Set the number of articles."""
         self.num_articles = value
 
+    @rx.event()
     def go_admin_page(self):
         self.clear_results()
         return rx.redirect("/admin")
-    
+
     def go_back(self):
         self.clear_results()
         return rx.redirect("/user")
@@ -157,7 +160,7 @@ class State(rx.State):
         async with self:
             self.is_training = False
         
-    @rx.event
+    @rx.event()
     def sort_by_date(self):
         """Sort the articles by date in ascending, descending, or original order."""
         # Helper function to parse the published date
@@ -165,7 +168,6 @@ class State(rx.State):
             try:
                 return int(published_str)
             except ValueError:
-                print("cheese")
                 return 0  # Use 0 for 'Unknown' or invalid years
                 
 
@@ -199,12 +201,12 @@ class State(rx.State):
         return self.is_populating or self.is_training
 
     @rx.var
-    def populate_button_color(self):
+    def populate_button_color(self) -> str | None:
         """Returns 'white' when populating is in progress."""
         return "white" if self.is_populating else None
 
     @rx.var
-    def retrain_button_color(self):
+    def retrain_button_color(self) -> str | None:
         """Returns 'white' when training is in progress."""
         return "white" if self.is_training else None
     
@@ -267,7 +269,7 @@ class State(rx.State):
 
 
     #export CSV functions
-    @rx.event
+    @rx.event()
     def export_results_to_csv(self):
         """Export search results to a CSV with title, authors, and published date."""
         if not self.results:
