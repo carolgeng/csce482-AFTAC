@@ -69,9 +69,9 @@ class State(rx.State):
         self.clear_results()
         return rx.redirect("/admin")
 
-    def go_back(self):
+    def go_search(self):
         self.clear_results()
-        return rx.redirect("/user")
+        return rx.redirect("/search")
 
     def clear_results(self):
         """Clear the search results and reset input fields."""
@@ -264,7 +264,7 @@ class State(rx.State):
     def on_login_success(self, id_token: dict):
         """Handle successful login and store the ID token."""
         self.id_token_json = json.dumps(id_token)
-        return rx.redirect("/user")
+        return rx.redirect("/search")
     
     def logout(self):
         """Log the user out by clearing the ID token."""
@@ -274,11 +274,11 @@ class State(rx.State):
 
     def unprivileged_redirect(self):
         if not self.privileged_email:
-            return rx.redirect("/user")
+            return rx.redirect("/search")
         
     def on_login_page(self):
         if self.token_is_valid:
-            return rx.redirect("/user")
+            return rx.redirect("/search")
 
     #export CSV functions
     @rx.event()

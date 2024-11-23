@@ -14,28 +14,33 @@ load_dotenv()
 CLIENT_ID = os.getenv('CLIENT_ID')
 
 # Google OAUTH components
-def user_info(self) -> rx.Component:
+def navigation_bar(self) -> rx.Component:
     """Display the user's information, including avatar and email."""
     email = self.email 
     return rx.hstack(
-        
         rx.button(
             "Logout", 
             on_click=State.logout,
             disabled=State.is_searching,
             background_color="grey"
         ),
+        rx.button(
+            "Search",
+            disabled=State.is_busy,
+            background_color="red",
+            on_click=State.go_search,
+        ),
         rx.cond(
             # we can add AFTAC here
             State.privileged_email,  
             rx.button(
-                "Admin Page",
+                "Admin",
                 disabled=State.is_searching,
                 on_click=State.go_admin_page,
                 background_color="red",
                 padding="10px"
             ),
-            rx.text(""),  
+            # nothing
         ),
         padding="10px",
     )
@@ -56,7 +61,7 @@ def require_google_login(page) -> rx.Component:
                 rx.cond(
                     State.token_is_valid,
                     page(),
-                    rx.button("Go back.", on_click=lambda: rx.redirect("/user")),
+                    rx.button("Go back.", on_click=lambda: rx.redirect("/search")),
                 ),
                 # nothing
             ),
@@ -72,6 +77,6 @@ def require_privilege(page) -> rx.Component:
         return rx.cond(
             State.privileged_email,
             page(),
-            rx.button("Go back.", on_click=lambda: rx.redirect("/user")),
+            rx.button("Go back.", on_click=lambda: rx.redirect("/search")),
         )
     return _auth_wrapper

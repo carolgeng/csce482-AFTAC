@@ -4,16 +4,16 @@
 
 import reflex as rx
 from ..state import State
-from ..components import require_google_login, user_info, login
+from ..components import require_google_login, navigation_bar, login
 
-@rx.page(route="/user")
+@rx.page(route="/search")
 @require_google_login
-def user_page() -> rx.Component:
+def search_page() -> rx.Component:
     """The admin page where users can search for articles."""
     return rx.container(
         rx.color_mode.button(position="top-right"),
         rx.vstack(
-            user_info(State.tokeninfo),
+            navigation_bar(State.tokeninfo),
             rx.heading("AFTAC: AI Driven R&D", size="2xl"),
             rx.text(
                 "Enter keywords to find relevant research papers.",

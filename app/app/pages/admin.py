@@ -2,7 +2,7 @@
 
 import reflex as rx
 from ..state import State
-from ..components import require_google_login, user_info, login, require_privilege
+from ..components import require_google_login, navigation_bar, login, require_privilege
 
 @rx.page(route="/admin",on_load=State.unprivileged_redirect)
 @require_google_login
@@ -13,13 +13,7 @@ def admin_page() -> rx.Component:
         rx.color_mode.button(position="top-right"),
         rx.vstack(
             rx.hstack(
-                rx.button(
-                    "Back",
-                    disabled=State.is_busy,
-                    background_color="red",
-                    on_click=State.go_back,
-                    margin_top="10px"
-                ),
+                navigation_bar(State.tokeninfo)
             ),
             rx.heading("AFTAC: AI Driven R&D", size="2xl"),
             rx.text(
