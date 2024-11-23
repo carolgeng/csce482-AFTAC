@@ -1,5 +1,4 @@
 # DatabaseManager.py
-
 import os
 import psycopg2
 from psycopg2 import sql

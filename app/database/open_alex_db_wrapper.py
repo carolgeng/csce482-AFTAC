@@ -1,16 +1,7 @@
 # OpenAlexDbWrapper.py
-
-import sys
-import os
 import hashlib
-
-# Add the project root to sys.path
-# current_dir = os.path.dirname(os.path.abspath(__file__))
-# project_root = os.path.abspath(os.path.join(current_dir, '..', '..'))
-# sys.path.append(project_root)
-
 from .DatabaseManager import DatabaseManager
-from .APIs.open_alex.open_alex_wrapper import openalex_api_handler  # Ensure the correct path
+from .APIs.open_alex.open_alex_wrapper import openalex_api_handler
 
 class OpenAlexDbWrapper:
     def __init__(self):
