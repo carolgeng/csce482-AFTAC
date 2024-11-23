@@ -6,7 +6,7 @@ class Article(rx.Base):
     authors: str
     summary: str
     pdf_url: str
-    published: str
+    published: int
     journal_ref: str = ""
     cit_count: int = 0 
     im_score: float = 0.0

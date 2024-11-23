@@ -30,15 +30,16 @@ class State(rx.State):
     is_populating: bool = False
     is_training: bool = False
 
+    sort_date_mode: str = "default" #default, ascending, descending
+
     """State for managing user data and article search."""
     # store the user's input keywords
     keywords: str = ""
     # store the user's desired number of articles as a string
     num_articles: str = "" 
     # store the search results as a list of Article models
+    original_results: list[Article] = []
     results: list[Article] = []
-
-    #UI components functions
 
     def validate_input(self):
         """Handle the click of the search button with input validation."""
@@ -53,7 +54,31 @@ class State(rx.State):
         except ValueError:
             return rx.toast.warning("Number of articles must be an integer.")
 
+    def set_keywords(self, value):
+        """Set the search keywords."""
+        self.keywords = value
 
+    def set_num_articles(self, value):
+        """Set the number of articles."""
+        self.num_articles = value
+
+    def go_admin_page(self):
+        self.clear_results()
+        return rx.redirect("/admin")
+    
+    def go_back(self):
+        self.clear_results()
+        return rx.redirect("/user")
+
+    def clear_results(self):
+        """Clear the search results and reset input fields."""
+        self.results = []
+        self.original_results = []
+        self.keywords = ""
+        self.num_articles = ""
+        self.sort_date_mode = "default"
+
+    #UI components functions
     @rx.event(background=True)
     async def search_articles(self):
         """Function to handle article search and ranking."""
@@ -74,11 +99,10 @@ class State(rx.State):
         new_results = []
 
         if ranked_articles.empty:
-            print("No articles found for the given query.")
             async with self:
                 self.results = []
                 self.is_searching = False
-            return
+            return rx.toast.error("No articles found for the given query.")
 
         for _, result in ranked_articles.iterrows():
             # Filter out None values in authors
@@ -90,32 +114,18 @@ class State(rx.State):
                 authors=authors_str,
                 summary=result['abstract'] or 'No abstract available.',
                 pdf_url=result['pdf_url'] or '#',
-                published=str(result['publication_year']) or 'Unknown',
+                published=int(result['publication_year']) or -1,
                 journal_ref="",  # Update if journal references are available
             )
             new_results.append(article)
             # Update the results and is_searching flag inside async with self
             async with self:
                 self.results = new_results
+                self.original_results = new_results#.copy()
                 self.is_searching = False
+                self.sort_date_mode = "default"
 
         return rx.toast.success(f"fetched {len(self.results)} articles!")
-
-    @rx.var
-    def is_busy(self) -> bool:
-        """Returns True if the system is currently searching or training."""
-        return self.is_populating or self.is_training
-
-    @rx.var
-    def populate_button_color(self):
-        """Returns 'white' when populating is in progress."""
-        return "white" if self.is_populating else None
-
-    @rx.var
-    def retrain_button_color(self):
-        """Returns 'white' when training is in progress."""
-        return "white" if self.is_training else None
-    
 
     @rx.event(background=True)
     async def populate_database(self):
@@ -138,7 +148,7 @@ class State(rx.State):
             self.is_populating = False
 
         return rx.toast.success(f"Database populated with {num_articles_int} articles for query '{self.keywords}'.")
-
+    
     @rx.event(background=True)
     async def retrain_model(self):
         async with self:
@@ -147,32 +157,67 @@ class State(rx.State):
         async with self:
             self.is_training = False
         
-        
- 
-    def set_keywords(self, value):
-        """Set the search keywords."""
-        self.keywords = value
+    @rx.event
+    def sort_by_date(self):
+        """Sort the articles by date in ascending, descending, or original order."""
+        # Helper function to parse the published date
+        def parse_year(published_str):
+            try:
+                return int(published_str)
+            except ValueError:
+                print("cheese")
+                return 0  # Use 0 for 'Unknown' or invalid years
+                
 
-    def set_num_articles(self, value):
-        """Set the number of articles."""
-        self.num_articles = value
+        if self.sort_date_mode == "default":
+            # First click: sort ascending
+            self.sort_date_mode = "ascending"
+            self.results = sorted(
+                self.results,
+                key=lambda article: parse_year(article.published)
+            )
+        elif self.sort_date_mode == "ascending":
+            # Second click: sort descending
+            self.sort_date_mode = "descending"
+            self.results = sorted(
+                self.results,
+                key=lambda article: parse_year(article.published),
+                reverse=True
+            )
+        elif self.sort_date_mode == "descending":
+            # Third click: return to original order
+            self.sort_date_mode = "default"
+            self.results = self.original_results.copy()
 
-    def go_admin_page(self):
-        self.clear_results()
-        return rx.redirect("/admin")
+    @rx.var
+    def no_results(self) -> bool:
+        return self.is_searching or not self.original_results
+
+    @rx.var
+    def is_busy(self) -> bool:
+        """Returns True if the system is currently searching or training."""
+        return self.is_populating or self.is_training
+
+    @rx.var
+    def populate_button_color(self):
+        """Returns 'white' when populating is in progress."""
+        return "white" if self.is_populating else None
+
+    @rx.var
+    def retrain_button_color(self):
+        """Returns 'white' when training is in progress."""
+        return "white" if self.is_training else None
     
-    def go_back(self):
-        self.clear_results()
-        return rx.redirect("/user")
-
-
-    def clear_results(self):
-        """Clear the search results and reset input fields."""
-        self.results = []
-        self.keywords = ""
-        self.num_articles = ""
-
-
+    @rx.var
+    def sort_date_label(self) -> str:
+        """Returns the label for the 'Sort by date' button with an arrow indicating the sort order."""
+        if self.sort_date_mode == "default":
+            return "Sort by date"
+        elif self.sort_date_mode == "ascending":
+            return "Sort by date \u25b2"
+        elif self.sort_date_mode == "descending":
+            return "Sort by date \u25bc"
+    
     #Google OAUTH functions
     @rx.var(cache=True)
     def email(self) -> str:

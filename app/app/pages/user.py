@@ -51,14 +51,14 @@ def user_page() -> rx.Component:
                  rx.button(
                     "Clear Results",
                     on_click=State.clear_results,
-                    disabled=State.is_searching,
+                    disabled=State.no_results,
                     background_color="blue",
                     margin_top="10px"
                 ),
                 rx.button(
                     "Export to CSV",
                     on_click=State.export_results_to_csv,
-                    disabled=State.is_searching,
+                    disabled=State.no_results,
                     background_color="blue",
                     margin_top="10px"
                 ),
@@ -69,21 +69,21 @@ def user_page() -> rx.Component:
                  rx.button(
                     "Sort by citation count",
                     #on_click=State.clear_results,
-                    disabled=State.is_searching,
+                    disabled=State.no_results,
                     background_color="green",
                     margin_top="10px"
                 ),
                 rx.button(
-                    "Sort by date",
-                    #on_click=State.export_results_to_csv,
-                    disabled=State.is_searching,
+                    State.sort_date_label,
+                    on_click=State.sort_by_date,
+                    disabled=State.no_results,
                     background_color="green",
                     margin_top="10px"
                 ),
                 rx.button(
                     "Sort by impact score",
                     #on_click=State.export_results_to_csv,
-                    disabled=State.is_searching,
+                    disabled=State.no_results,
                     background_color="green",
                     margin_top="10px"
                 ),
