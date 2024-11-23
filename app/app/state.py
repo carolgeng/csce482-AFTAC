@@ -1,42 +1,28 @@
+import os
+import reflex as rx
+from dotenv import load_dotenv
 
 # for oauth
 import json
-import os
 import time
 from google.auth.transport import requests
 from google.oauth2.id_token import verify_oauth2_token
-from dotenv import load_dotenv
+
+# for article serach app
+from .article import Article
+from model.RankModel import RankModel
+from database.populate_db import DatabaseSearchService
 
 # to export csv
 import csv
 from io import StringIO
-
-# for article serach app
-import reflex as rx
-from database.APIs.arXiv.arXiv_wrapper import api_handler
-from datetime import datetime
-from model.RankModel import RankModel
-from database.populate_db import DatabaseSearchService
 
 # gets client id from env file
 load_dotenv()
 CLIENT_ID = os.getenv('CLIENT_ID')
 
 
-# structure that holds the contents of the search results 
-class Article(rx.Base):
-    title: str
-    authors: str
-    summary: str
-    pdf_url: str
-    published: str
-    journal_ref: str = ""
-    cit_count: int = 0 
-    im_score: float = 0.0
-
-
 class State(rx.State):
-
     # for oauth use token instead of goole client secret 
     id_token_json: str = rx.LocalStorage()
 
@@ -44,72 +30,64 @@ class State(rx.State):
     is_populating: bool = False
     is_training: bool = False
 
+    """State for managing user data and article search."""
+    # store the user's input keywords
+    keywords: str = ""
+    # store the user's desired number of articles as a string
+    num_articles: str = "" 
+    # store the search results as a list of Article models
+    results: list[Article] = []
+
+    #UI components functions
     @rx.var
     def is_busy(self) -> bool:
         """Returns True if the system is currently searching or training."""
         return self.is_populating or self.is_training
 
-    def on_success(self, id_token: dict):
-        """Handle successful login and store the ID token."""
-        self.id_token_json = json.dumps(id_token)
-        return rx.redirect("/user")
-
-    @rx.var(cache=True)
-    def email(self) -> str:
-        """Extract the user's email from tokeninfo."""
-        tokeninfo = self.tokeninfo  # Access the reactive tokeninfo variable
-        # If tokeninfo exists and has an 'email' key, return it, otherwise return an empty string
-        return tokeninfo["email"] if "email" in tokeninfo else ""
-
-    @rx.var(cache=True)
-    def tokeninfo(self) -> dict[str, str]:
-        """Verify and parse the user's ID token."""
-        try:
-            return verify_oauth2_token(
-                json.loads(self.id_token_json)[
-                    "credential"
-                ],
-                requests.Request(),
-                CLIENT_ID,
-            )
-        except Exception as exc:
-            if self.id_token_json:
-                print(f"Error verifying token: {exc}")
-        return {}
-
-    def logout(self):
-        """Log the user out by clearing the ID token."""
-        self.id_token_json = ""
-        self.clear_results()
-        return rx.redirect("/")
+    @rx.var
+    def populate_button_color(self):
+        """Returns 'white' when populating is in progress."""
+        return "white" if self.is_populating else None
 
     @rx.var
-    def token_is_valid(self) -> bool:
-        """Check if the user's token is valid."""
+    def retrain_button_color(self):
+        """Returns 'white' when training is in progress."""
+        return "white" if self.is_training else None
+    
+    @rx.event(background=True)
+    async def populate_database(self):
+
+        async with self:
+            self.is_populating = True
+
         try:
-            return bool(
-                self.tokeninfo
-                and int(self.tokeninfo.get("exp", 0))
-                > time.time()
-            )
-        except Exception:
-            return False
+            num_articles_int = int(self.num_articles)
+        except ValueError:
+            num_articles_int = 10  # Default or handle error
+        # Initialize the DatabaseSearchService with the query (keywords) and number of articles
+        search_service = DatabaseSearchService(query=self.keywords, num_articles=num_articles_int)
 
-    """State for managing user data and article search."""
-    # store the user's input keywords
-    keywords: str = ""
-    # store the user's desired number of articles as a string
-    num_articles: str = "10"  # Default value
-    # store the search results as a list of Article models
-    results: list[Article] = []
+        # Run the search and store the results in the databases
+        search_service.search_and_store()
 
-    def set_keywords(self, value):
-        """Set the search keywords."""
-        self.keywords = value
+        print(f"Database populated with {num_articles_int} articles for query '{self.keywords}'.")
 
-    def set_num_articles(self, value):
-        """Set the number of articles."""
-        self.num_articles = value
+          
+
+        async with self:
+            # Optionally clear results or reset fields after population  
+            self.clear_results()
+            self.is_populating = False
+
+    @rx.event(background=True)
+    async def retrain_model(self):
+        async with self:
+            self.is_training = True
+
+        RankModel().train_ml_model()
+
+        async with self:
+            self.is_training = False
 
     @rx.event(background=True)
     async def search_articles(self):
@@ -179,6 +157,71 @@ class State(rx.State):
         async with self:
             self.clear_results()
 
+    
+    def set_keywords(self, value):
+        """Set the search keywords."""
+        self.keywords = value
+
+    def set_num_articles(self, value):
+        """Set the number of articles."""
+        self.num_articles = value
+
+    def clear_results(self):
+        """Clear the search results and reset input fields."""
+        self.results = []
+        self.keywords = ""
+        self.num_articles = "10"
+
+
+    #Google OAUTH functions
+    @rx.var(cache=True)
+    def email(self) -> str:
+        """Extract the user's email from tokeninfo."""
+        tokeninfo = self.tokeninfo  # Access the reactive tokeninfo variable
+        # If tokeninfo exists and has an 'email' key, return it, otherwise return an empty string
+        return tokeninfo["email"] if "email" in tokeninfo else ""
+
+    @rx.var(cache=True)
+    def tokeninfo(self) -> dict[str, str]:
+        """Verify and parse the user's ID token."""
+        try:
+            return verify_oauth2_token(
+                json.loads(self.id_token_json)[
+                    "credential"
+                ],
+                requests.Request(),
+                CLIENT_ID,
+            )
+        except Exception as exc:
+            if self.id_token_json:
+                print(f"Error verifying token: {exc}")
+        return {}
+
+    @rx.var
+    def token_is_valid(self) -> bool:
+        """Check if the user's token is valid."""
+        try:
+            return bool(
+                self.tokeninfo
+                and int(self.tokeninfo.get("exp", 0))
+                > time.time()
+            )
+        except Exception:
+            return False
+        
+    def on_success(self, id_token: dict):
+        """Handle successful login and store the ID token."""
+        self.id_token_json = json.dumps(id_token)
+        return rx.redirect("/user")
+    
+    def logout(self):
+        """Log the user out by clearing the ID token."""
+        self.id_token_json = ""
+        self.clear_results()
+        return rx.redirect("/")
+
+
+    #export CSV functions
     @rx.event
     def export_results_to_csv(self):
         """Export search results to a CSV with title, authors, and published date."""
@@ -208,54 +251,3 @@ class State(rx.State):
             data=output.getvalue(),
             filename=filename,
         )
-    
-    @rx.event(background=True)
-    async def populate_database(self):
-
-        async with self:
-            self.is_populating = True
-
-        try:
-            num_articles_int = int(self.num_articles)
-        except ValueError:
-            num_articles_int = 10  # Default or handle error
-        # Initialize the DatabaseSearchService with the query (keywords) and number of articles
-        search_service = DatabaseSearchService(query=self.keywords, num_articles=num_articles_int)
-
-        # Run the search and store the results in the databases
-        search_service.search_and_store()
-
-        print(f"Database populated with {num_articles_int} articles for query '{self.keywords}'.")
-
-          
-
-        async with self:
-            # Optionally clear results or reset fields after population  
-            self.clear_results()
-            self.is_populating = False
-
-    @rx.event(background=True)
-    async def retrain_model(self):
-        async with self:
-            self.is_training = True
-
-        RankModel().train_ml_model()
-
-        async with self:
-            self.is_training = False
-
-    def clear_results(self):
-        """Clear the search results and reset input fields."""
-        self.results = []
-        self.keywords = ""
-        self.num_articles = "10"
-
-    @rx.var
-    def populate_button_color(self):
-        """Returns 'white' when populating is in progress."""
-        return "white" if self.is_populating else None
-
-    @rx.var
-    def retrain_button_color(self):
-        """Returns 'white' when training is in progress."""
-        return "white" if self.is_training else None
