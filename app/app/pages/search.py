@@ -4,7 +4,7 @@
 
 import reflex as rx
 from ..state import State
-from ..components import require_google_login, navigation_bar, login
+from ..components import require_google_login, navigation_bar
 
 @rx.page(route="/search")
 @require_google_login

@@ -197,6 +197,20 @@ class State(rx.State):
         return (email != "") and ((email == "mev@tamu.edu") or (email == "sulaiman_1@tamu.edu") or (email == "sryeruva@tamu.edu") or (email == "alecklem@tamu.edu") or (email == "paulinewade@tamu.edu"))
 
     @rx.var
+    def valid_buttons(self) -> list[str]:
+        print(self.router_data["pathname"])
+        page_names: list[str] = ["/admin", "/search"]
+
+        if not self.privileged_email:
+            page_names.remove("/admin")
+        try:
+            page_names.remove(self.router_data["pathname"])
+        except:
+            pass
+        return page_names
+
+
+    @rx.var
     def no_results(self) -> bool:
         return self.is_searching or not self.original_results
 
@@ -264,6 +278,8 @@ class State(rx.State):
     def on_login_success(self, id_token: dict):
         """Handle successful login and store the ID token."""
         self.id_token_json = json.dumps(id_token)
+        if self.privileged_email:
+            return rx.redirect("/admin")
         return rx.redirect("/search")
     
     def logout(self):

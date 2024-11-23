@@ -16,7 +16,6 @@ CLIENT_ID = os.getenv('CLIENT_ID')
 # Google OAUTH components
 def navigation_bar(self) -> rx.Component:
     """Display the user's information, including avatar and email."""
-    email = self.email 
     return rx.vstack(
         rx.heading("AFTAC: AI Driven R&D", size="2xl"),
         rx.hstack(
@@ -26,24 +25,30 @@ def navigation_bar(self) -> rx.Component:
                 disabled=State.is_searching,
                 background_color="grey"
             ),
-            rx.button(
-                "Search",
-                disabled=State.is_busy,
-                background_color="red",
-                on_click=State.go_search,
-            ),
-            rx.cond(
-                # we can add AFTAC here
-                State.privileged_email,  
-                rx.button(
-                    "Admin",
-                    disabled=State.is_searching,
-                    on_click=State.go_admin_page,
-                    background_color="red",
-                    padding="10px"
-                ),
-                # nothing
-            ),
+            rx.foreach(
+                State.valid_buttons,
+                lambda button: rx.vstack(
+                    rx.cond(
+                        button == "/search",
+                        rx.button(
+                            "Search",
+                            disabled=State.is_busy,
+                            background_color="red",
+                            on_click=State.go_search,
+                        )
+                    ),
+                    rx.cond(
+                        button == "/admin",
+                        rx.button(
+                            "Admin",
+                            disabled=State.is_searching,
+                            on_click=State.go_admin_page,
+                            background_color="red",
+                            padding="10px"
+                        )
+                    )
+                )
+            )
         )
     )
 
@@ -63,7 +68,7 @@ def require_google_login(page) -> rx.Component:
                 rx.cond(
                     State.token_is_valid,
                     page(),
-                    rx.button("Go back.", on_click=lambda: rx.redirect("/search")),
+                    rx.button("Go back.", on_click=lambda: rx.redirect("/")),
                 ),
                 # nothing
             ),
@@ -79,6 +84,6 @@ def require_privilege(page) -> rx.Component:
         return rx.cond(
             State.privileged_email,
             page(),
-            rx.button("Go back.", on_click=lambda: rx.redirect("/search")),
+            rx.button("Go back.", on_click=lambda: rx.redirect("/")),
         )
     return _auth_wrapper
