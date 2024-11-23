@@ -64,3 +64,12 @@ def require_google_login(page) -> rx.Component:
     return _auth_wrapper
 
 # UI Components
+def need_privilege(page) -> rx.Component:
+    @functools.wraps(page)
+    def _auth_wrapper() -> rx.Component:
+        return rx.cond(
+            State.privileged_email,
+            page(),
+            rx.button("Go back.", on_click=lambda: rx.redirect("/")),
+        )
+    return _auth_wrapper

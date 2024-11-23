@@ -2,10 +2,11 @@
 
 import reflex as rx
 from ..state import State
-from ..components import require_google_login, user_info, login
+from ..components import require_google_login, user_info, login, need_privilege
 
 @rx.page(route="/admin")
 @require_google_login
+@need_privilege
 def admin_page() -> rx.Component:
     """The admin page where users can search for articles."""
     return rx.container(

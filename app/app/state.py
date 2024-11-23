@@ -192,6 +192,11 @@ class State(rx.State):
             self.results = self.original_results.copy()
 
     @rx.var
+    def privileged_email(self) -> bool:
+        email = self.email
+        return (email != "") and ((email == "mev@tamu.edu") or (email == "sulaiman_1@tamu.edu") or (email == "sryeruva@tamu.edu") or (email == "alecklem@tamu.edu") or (email == "paulinewade@tamu.edu"))
+
+    @rx.var
     def no_results(self) -> bool:
         return self.is_searching or not self.original_results
 
