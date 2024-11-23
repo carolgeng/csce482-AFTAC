@@ -17,32 +17,34 @@ CLIENT_ID = os.getenv('CLIENT_ID')
 def navigation_bar(self) -> rx.Component:
     """Display the user's information, including avatar and email."""
     email = self.email 
-    return rx.hstack(
-        rx.button(
-            "Logout", 
-            on_click=State.logout,
-            disabled=State.is_searching,
-            background_color="grey"
-        ),
-        rx.button(
-            "Search",
-            disabled=State.is_busy,
-            background_color="red",
-            on_click=State.go_search,
-        ),
-        rx.cond(
-            # we can add AFTAC here
-            State.privileged_email,  
+    return rx.vstack(
+        rx.heading("AFTAC: AI Driven R&D", size="2xl"),
+        rx.hstack(
             rx.button(
-                "Admin",
+                "Logout", 
+                on_click=State.logout,
                 disabled=State.is_searching,
-                on_click=State.go_admin_page,
-                background_color="red",
-                padding="10px"
+                background_color="grey"
             ),
-            # nothing
-        ),
-        padding="10px",
+            rx.button(
+                "Search",
+                disabled=State.is_busy,
+                background_color="red",
+                on_click=State.go_search,
+            ),
+            rx.cond(
+                # we can add AFTAC here
+                State.privileged_email,  
+                rx.button(
+                    "Admin",
+                    disabled=State.is_searching,
+                    on_click=State.go_admin_page,
+                    background_color="red",
+                    padding="10px"
+                ),
+                # nothing
+            ),
+        )
     )
 
 def login() -> rx.Component:

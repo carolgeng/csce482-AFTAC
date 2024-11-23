@@ -15,7 +15,7 @@ def admin_page() -> rx.Component:
             rx.hstack(
                 navigation_bar(State.tokeninfo)
             ),
-            rx.heading("AFTAC: AI Driven R&D", size="2xl"),
+            # rx.heading("AFTAC: AI Driven R&D", size="2xl"),
             rx.text(
                 "Enter keywords to populate the database.",
                 font_size="lg"

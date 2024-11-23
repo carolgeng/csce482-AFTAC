@@ -14,7 +14,6 @@ def search_page() -> rx.Component:
         rx.color_mode.button(position="top-right"),
         rx.vstack(
             navigation_bar(State.tokeninfo),
-            rx.heading("AFTAC: AI Driven R&D", size="2xl"),
             rx.text(
                 "Enter keywords to find relevant research papers.",
                 font_size="lg"
