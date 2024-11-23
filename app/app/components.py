@@ -27,7 +27,7 @@ def user_info(self) -> rx.Component:
         ),
         rx.cond(
             # we can add AFTAC here
-            (email != "") & ((email == "mev@tamu.edu") | (email == "sulaiman_1@tamu.edu") | (email == "sryeruva@tamu.edu") | (email == "alecklem@tamu.edu") ),  
+            State.privileged_email,  
             rx.button(
                 "Admin Page",
                 disabled=State.is_searching,
@@ -43,7 +43,7 @@ def user_info(self) -> rx.Component:
 def login() -> rx.Component:
     """Display the Google Login button."""
     return rx.vstack(
-        GoogleLogin.create(on_success=State.on_success),
+        GoogleLogin.create(on_success=State.on_login_success),
     )
 
 def require_google_login(page) -> rx.Component:
@@ -54,9 +54,11 @@ def require_google_login(page) -> rx.Component:
             rx.cond(
                 State.is_hydrated,
                 rx.cond(
-                    State.token_is_valid, page(), login()
+                    State.token_is_valid,
+                    page(),
+                    rx.button("Go back.", on_click=lambda: rx.redirect("/user")),
                 ),
-                rx.spinner(),
+                # nothing
             ),
             client_id=CLIENT_ID,
         )
@@ -64,12 +66,12 @@ def require_google_login(page) -> rx.Component:
     return _auth_wrapper
 
 # UI Components
-def need_privilege(page) -> rx.Component:
+def require_privilege(page) -> rx.Component:
     @functools.wraps(page)
     def _auth_wrapper() -> rx.Component:
         return rx.cond(
             State.privileged_email,
             page(),
-            rx.button("Go back.", on_click=lambda: rx.redirect("/")),
+            rx.button("Go back.", on_click=lambda: rx.redirect("/user")),
         )
     return _auth_wrapper

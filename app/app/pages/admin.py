@@ -2,16 +2,25 @@
 
 import reflex as rx
 from ..state import State
-from ..components import require_google_login, user_info, login, need_privilege
+from ..components import require_google_login, user_info, login, require_privilege
 
-@rx.page(route="/admin")
+@rx.page(route="/admin",on_load=State.unprivileged_redirect)
 @require_google_login
-@need_privilege
+@require_privilege
 def admin_page() -> rx.Component:
     """The admin page where users can search for articles."""
     return rx.container(
         rx.color_mode.button(position="top-right"),
         rx.vstack(
+            rx.hstack(
+                rx.button(
+                    "Back",
+                    disabled=State.is_busy,
+                    background_color="red",
+                    on_click=State.go_back,
+                    margin_top="10px"
+                ),
+            ),
             rx.heading("AFTAC: AI Driven R&D", size="2xl"),
             rx.text(
                 "Enter keywords to populate the database.",
@@ -53,15 +62,7 @@ def admin_page() -> rx.Component:
                     margin_top="10px"
                 ),
             ),
-            rx.hstack(
-                rx.button(
-                    "Back",
-                    disabled=State.is_busy,
-                    background_color="red",
-                    on_click=State.go_back,
-                    margin_top="10px"
-                ),
-            ),
+            
             # Display results
             rx.vstack(
                 rx.foreach(
@@ -109,8 +110,5 @@ def admin_page() -> rx.Component:
                 align_items="start",
                 margin_top="20px"
             ),
-            spacing="5",
-            justify="center",
-            min_height="85vh",
         ),
     )

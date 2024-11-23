@@ -261,7 +261,7 @@ class State(rx.State):
         except Exception:
             return False
         
-    def on_success(self, id_token: dict):
+    def on_login_success(self, id_token: dict):
         """Handle successful login and store the ID token."""
         self.id_token_json = json.dumps(id_token)
         return rx.redirect("/user")
@@ -272,6 +272,13 @@ class State(rx.State):
         self.clear_results()
         return rx.redirect("/")
 
+    def unprivileged_redirect(self):
+        if not self.privileged_email:
+            return rx.redirect("/user")
+        
+    def on_login_page(self):
+        if self.token_is_valid:
+            return rx.redirect("/user")
 
     #export CSV functions
     @rx.event()

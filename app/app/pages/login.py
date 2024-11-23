@@ -4,10 +4,10 @@ from ..components import login
 from ..react_oauth_google import GoogleOAuthProvider
 import os
 
-@rx.page(route="/")
+@rx.page(route="/",on_load=State.on_login_page)
 def login_page() -> rx.Component:
     """The login page with welcome text and Google sign-in button."""
-    return GoogleOAuthProvider.create(
+    return rx.cond(State.is_hydrated, GoogleOAuthProvider.create(
         rx.center(
             rx.color_mode.button(position="top-right"),
             rx.card(
@@ -42,4 +42,4 @@ def login_page() -> rx.Component:
             bg="gray.200",  # Light background for contrast
         ),
         client_id=os.getenv("CLIENT_ID"),
-    )
+    ), )
