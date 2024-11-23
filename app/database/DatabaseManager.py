@@ -399,6 +399,30 @@ class DatabaseManager:
         except psycopg2.Error as e:
             print(f"Error inserting/updating Paper-Concept association (Paper ID: {paper_id}, Concept ID: {concept_id}): {e}")
 
+    def insert_admin(self, email: str):
+        query = sql.SQL("INSERT INTO admins(email) VALUES ({email})").format(email=sql.Placeholder())
+        try:
+            self.cursor.execute(query, [email])
+            return None
+        except Exception as e:
+            return e
+        
+    def remove_admin(self, email: str):
+        query = sql.SQL("DELETE FROM admins WHERE email = {email}").format(email=sql.Placeholder())
+        try:
+            self.cursor.execute(query, [email])
+            return None
+        except Exception as e:
+            return e
+                
+    def get_admins(self):
+        query = sql.SQL("SELECT * FROM admins")
+        try:
+            self.cursor.execute(query, [])
+            return self.cursor.fetchall()
+        except Exception as e:
+            return e
+
     def close(self):
         """Close the database connection."""
         try:
@@ -407,6 +431,8 @@ class DatabaseManager:
             print("Database connection closed.\n")
         except psycopg2.Error as e:
             print(f"Error closing the database connection: {e}")
+
+    
 
 if __name__ == "__main__":
     """

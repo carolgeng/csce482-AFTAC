@@ -12,6 +12,7 @@ from google.oauth2.id_token import verify_oauth2_token
 from .article import Article
 from model.RankModel import RankModel
 from database.populate_db import DatabaseSearchService
+from database.DatabaseManager import DatabaseManager
 
 # to export csv
 import csv
@@ -31,6 +32,7 @@ class State(rx.State):
     is_training: bool = False
 
     sort_date_mode: str = "default" #default, ascending, descending
+    admin_entry: str = ""
 
     """State for managing user data and article search."""
     # store the user's input keywords
@@ -83,6 +85,28 @@ class State(rx.State):
         self.keywords = ""
         self.num_articles = ""
         self.sort_date_mode = "default"
+        self.admin_entry = ""
+
+    @rx.var
+    def get_admins(self) -> list[str]:
+        try:
+            return [t[1] for t in DatabaseManager().get_admins()]
+        except Exception:
+            return rx.toast.error("Failed to display admins")
+    
+    @rx.event()
+    def set_admin_entry(self, value: str):
+        """Set the number of articles."""
+        self.admin_entry = value
+
+    @rx.event
+    def add_admin(self):
+        DatabaseManager().insert_admin(self.admin_entry)
+        self.clear_results()
+
+    @rx.event
+    def remove_admin(self, email: str):
+        DatabaseManager().remove_admin(email)
 
     #UI components functions
     @rx.event(background=True)
@@ -197,7 +221,7 @@ class State(rx.State):
     @rx.var
     def privileged_email(self) -> bool:
         email = self.email
-        return (email != "") and ((email == "mev@tamu.edu") or (email == "sulaiman_1@tamu.edu") or (email == "sryeruva@tamu.edu") or (email == "alecklem@tamu.edu") or (email == "paulinewade@tamu.edu"))
+        return email in self.get_admins
 
     @rx.var
     def valid_buttons(self) -> list[str]:
