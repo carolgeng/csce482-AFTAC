@@ -43,15 +43,15 @@ class State(rx.State):
     def validate_input(self):
         """Handle the click of the search button with input validation."""
         if not self.keywords.strip():
-            return rx.toast("Keywords cannot be empty.")
+            return rx.toast.warning("Keywords cannot be empty.")
         if not self.num_articles.strip():
-            return rx.toast("Number of articles cannot be empty.")
+            return rx.toast.warning("Number of articles cannot be empty.")
         try:
             num_articles_int = int(self.num_articles)
             if num_articles_int <= 0:
-                return rx.toast("Number of articles must be a positive integer.")
+                return rx.toast.warning("Number of articles must be a positive integer.")
         except ValueError:
-            return rx.toast("Number of articles must be an integer.")
+            return rx.toast.warning("Number of articles must be an integer.")
 
 
     @rx.event(background=True)
@@ -99,6 +99,7 @@ class State(rx.State):
                 self.results = new_results
                 self.is_searching = False
 
+        return rx.toast.success(f"fetched {len(self.results)} articles!")
 
     @rx.var
     def is_busy(self) -> bool:
@@ -124,7 +125,6 @@ class State(rx.State):
         async with self:
             self.is_populating = True
 
-
         num_articles_int = int(self.num_articles)
         
         # Initialize the DatabaseSearchService with the query (keywords) and number of articles
@@ -132,27 +132,23 @@ class State(rx.State):
 
         # Run the search and store the results in the databases
         search_service.search_and_store()
-
-        print(f"Database populated with {num_articles_int} articles for query '{self.keywords}'.")
-
-          
-
+        
         async with self:
-            # Optionally clear results or reset fields after population  
             self.clear_results()
             self.is_populating = False
+
+        return rx.toast.success(f"Database populated with {num_articles_int} articles for query '{self.keywords}'.")
 
     @rx.event(background=True)
     async def retrain_model(self):
         async with self:
             self.is_training = True
-
         RankModel().train_ml_model()
-
         async with self:
             self.is_training = False
-
-    
+        
+        
+ 
     def set_keywords(self, value):
         """Set the search keywords."""
         self.keywords = value
