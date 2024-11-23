@@ -46,6 +46,16 @@ def navigation_bar(self) -> rx.Component:
                             background_color="red",
                             padding="10px"
                         )
+                    ),
+                    rx.cond(
+                        button == "/users",
+                        rx.button(
+                            "Users",
+                            disabled=State.is_searching,
+                            on_click=State.go_users,
+                            background_color="red",
+                            padding="10px"
+                        )
                     )
                 )
             )

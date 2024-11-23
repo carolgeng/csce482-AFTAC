@@ -64,7 +64,6 @@ class State(rx.State):
         """Set the number of articles."""
         self.num_articles = value
 
-    @rx.event()
     def go_admin_page(self):
         self.clear_results()
         return rx.redirect("/admin")
@@ -72,6 +71,10 @@ class State(rx.State):
     def go_search(self):
         self.clear_results()
         return rx.redirect("/search")
+    
+    def go_users(self):
+        self.clear_results()
+        return rx.redirect("/users")
 
     def clear_results(self):
         """Clear the search results and reset input fields."""
@@ -198,11 +201,10 @@ class State(rx.State):
 
     @rx.var
     def valid_buttons(self) -> list[str]:
-        print(self.router_data["pathname"])
-        page_names: list[str] = ["/admin", "/search"]
+        page_names: list[str] = ["/search"]
 
-        if not self.privileged_email:
-            page_names.remove("/admin")
+        if self.privileged_email:
+            page_names += ["/admin", "/users"]
         try:
             page_names.remove(self.router_data["pathname"])
         except:
