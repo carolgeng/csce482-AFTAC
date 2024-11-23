@@ -57,7 +57,7 @@ def admin_page() -> rx.Component:
                     "Back",
                     disabled=State.is_busy,
                     background_color="red",
-                    on_click=rx.redirect("/user"),
+                    on_click=State.go_back,
                     margin_top="10px"
                 ),
             ),

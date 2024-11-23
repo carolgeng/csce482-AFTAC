@@ -29,9 +29,9 @@ def user_info(self) -> rx.Component:
             rx.button(
                 "Admin Page",
                 disabled=State.is_searching,
-                on_click=lambda: rx.redirect("/admin"),
+                on_click=State.go_admin_page,
                 background_color="red",
-                padding="10px",
+                padding="10px"
             ),
             rx.text(""),  
         ),

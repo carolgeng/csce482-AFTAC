@@ -39,6 +39,67 @@ class State(rx.State):
     results: list[Article] = []
 
     #UI components functions
+
+    def validate_input(self):
+        """Handle the click of the search button with input validation."""
+        if not self.keywords.strip():
+            return rx.toast("Keywords cannot be empty.")
+        if not self.num_articles.strip():
+            return rx.toast("Number of articles cannot be empty.")
+        try:
+            num_articles_int = int(self.num_articles)
+            if num_articles_int <= 0:
+                return rx.toast("Number of articles must be a positive integer.")
+        except ValueError:
+            return rx.toast("Number of articles must be an integer.")
+
+
+    @rx.event(background=True)
+    async def search_articles(self):
+        """Function to handle article search and ranking."""
+
+        if a := self.validate_input(): return a
+
+        async with self:
+            self.is_searching = True
+        
+
+        num_articles_int = int(self.num_articles)
+
+        rank_model = RankModel()
+        # Get ranked articles from the model
+        ranked_articles = rank_model.rank_articles(self.keywords, num_articles=num_articles_int)
+
+        # Build up a new list to store articles
+        new_results = []
+
+        if ranked_articles.empty:
+            print("No articles found for the given query.")
+            async with self:
+                self.results = []
+                self.is_searching = False
+            return
+
+        for _, result in ranked_articles.iterrows():
+            # Filter out None values in authors
+            authors_list = [a for a in result['authors'] if a] if result['authors'] else []
+            authors_str = ', '.join(authors_list) if authors_list else 'Unknown'
+
+            article = Article(
+                title=result['title'],
+                authors=authors_str,
+                summary=result['abstract'] or 'No abstract available.',
+                pdf_url=result['pdf_url'] or '#',
+                published=str(result['publication_year']) or 'Unknown',
+                journal_ref="",  # Update if journal references are available
+            )
+            new_results.append(article)
+            # Update the results and is_searching flag inside async with self
+            async with self:
+                self.results = new_results
+                self.is_searching = False
+
+
     @rx.var
     def is_busy(self) -> bool:
         """Returns True if the system is currently searching or training."""
@@ -54,16 +115,18 @@ class State(rx.State):
         """Returns 'white' when training is in progress."""
         return "white" if self.is_training else None
     
+
     @rx.event(background=True)
     async def populate_database(self):
+
+        if a := self.validate_input(): return a
 
         async with self:
             self.is_populating = True
 
-        try:
-            num_articles_int = int(self.num_articles)
-        except ValueError:
-            num_articles_int = 10  # Default or handle error
+
+        num_articles_int = int(self.num_articles)
+        
         # Initialize the DatabaseSearchService with the query (keywords) and number of articles
         search_service = DatabaseSearchService(query=self.keywords, num_articles=num_articles_int)
 
@@ -89,74 +152,6 @@ class State(rx.State):
         async with self:
             self.is_training = False
 
-    @rx.event(background=True)
-    async def search_articles(self):
-        """Function to handle article search and ranking."""
-        async with self:
-            self.is_searching = True
-        try:
-            num_articles_int = int(self.num_articles)
-        except ValueError:
-            num_articles_int = 10  # Default or handle error
-
-        rank_model = RankModel()
-        # Get ranked articles from the model
-        # ranked_articles = await rx.run_in_thread(rank_model.rank_articles, self.keywords, num_articles=num_articles_int)
-        ranked_articles = rank_model.rank_articles(self.keywords, num_articles=num_articles_int)
-        # Build up a new list to store articles
-        new_results = []
-
-        if ranked_articles.empty:
-            print("No articles found for the given query.")
-            async with self:
-                self.results = []
-                self.is_searching = False
-            return
-        
-        # # Convert published to string
-        # published_str = result.published.strftime('%Y-%m-%d %H:%M:%S') if result.published else ''
-
-        # # Ensure journal_ref is a string
-        # journal_ref = getattr(result, 'journal_ref', '') or ''
-
-        for _, result in ranked_articles.iterrows():
-            # Filter out None values in authors
-            authors_list = [a for a in result['authors'] if a] if result['authors'] else []
-            authors_str = ', '.join(authors_list) if authors_list else 'Unknown'
-
-            article = Article(
-                title=result['title'],
-                authors=authors_str,
-                summary=result['abstract'] or 'No abstract available.',
-                pdf_url=result['pdf_url'] or '#',
-                published=str(result['publication_year']) or 'Unknown',
-                journal_ref="",  # Update if journal references are available
-            )
-            new_results.append(article)
-            # Update the results and is_searching flag inside async with self
-            async with self:
-                self.results = new_results
-                self.is_searching = False
-
-    @rx.event(background=True)
-    async def populate_database(self):
-        try:
-            num_articles_int = int(self.num_articles)
-        except ValueError:
-            num_articles_int = 10  # Default or handle error
-
-        # Initialize the DatabaseSearchService with the query (keywords) and number of articles
-        search_service = DatabaseSearchService(query=self.keywords, num_articles=num_articles_int)
-
-        # Run the search and store the results in the databases
-        await rx.run_in_thread(search_service.search_and_store)
-
-        print(f"Database populated with {num_articles_int} articles for query '{self.keywords}'.")
-
-        # Optionally clear results or reset fields after population
-        async with self:
-            self.clear_results()
-
     
     def set_keywords(self, value):
         """Set the search keywords."""
@@ -166,11 +161,20 @@ class State(rx.State):
         """Set the number of articles."""
         self.num_articles = value
 
+    def go_admin_page(self):
+        self.clear_results()
+        return rx.redirect("/admin")
+    
+    def go_back(self):
+        self.clear_results()
+        return rx.redirect("/user")
+
+
     def clear_results(self):
         """Clear the search results and reset input fields."""
         self.results = []
         self.keywords = ""
-        self.num_articles = "10"
+        self.num_articles = ""
 
 
     #Google OAUTH functions
