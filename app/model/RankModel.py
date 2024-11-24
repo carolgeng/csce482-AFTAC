@@ -198,6 +198,7 @@ class RankModel:
                 p.publication_year,
                 p.delta_citations,
                 p.pdf_url,
+                j.journal_name,  
                 j.journal_h_index,
                 j.mean_citations_per_paper,
                 j.total_papers_published,
@@ -210,7 +211,12 @@ class RankModel:
             LEFT JOIN journals j ON p.journal_id = j.id
             LEFT JOIN paper_authors pa ON p.id = pa.paper_id
             LEFT JOIN authors a ON pa.author_id = a.id
-            GROUP BY p.id, j.journal_h_index, j.mean_citations_per_paper, j.total_papers_published
+            GROUP BY
+                p.id,
+                j.journal_name,  
+                j.journal_h_index,
+                j.mean_citations_per_paper,
+                j.total_papers_published
         """
         try:
             with self.connection.cursor() as cur:

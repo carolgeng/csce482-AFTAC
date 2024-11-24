@@ -152,7 +152,7 @@ class State(rx.State):
                 summary=result['abstract'] or 'No abstract available.',
                 pdf_url=result['pdf_url'] or '#',
                 published=int(result['publication_year']) or -1,
-                journal_ref="",  # Update if journal references are available
+                journal_ref=result['journal_name'] or 'No Journal available',  # Update if journal references are available
                 cit_count=result["total_citations"],
                 im_score=result["impact_score"]
             )
