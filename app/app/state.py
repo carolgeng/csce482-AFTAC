@@ -1,4 +1,5 @@
 import os
+import re
 import reflex as rx
 from dotenv import load_dotenv
 
@@ -66,7 +67,7 @@ class State(rx.State):
         self.clear_results()
         return rx.redirect("/users")
 
-    # input validation for search and admin pages
+    # input validation for search, users, and admin pages
     def validate_input(self):
         if not self.keywords.strip():
             return rx.toast.warning("Keywords cannot be empty.")
@@ -79,6 +80,24 @@ class State(rx.State):
         except ValueError:
             return rx.toast.warning("Number of articles must be an integer.")
 
+    def validate_email(self):
+        if not self.admin_entry.strip():
+            return rx.toast.warning("Admin field cannot be empty.")
+        
+        email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+    
+        # Check if the provided email matches the regex
+        if not re.match(email_regex, self.admin_entry.strip()):
+            return rx.toast.warning("Invalid email format. Please enter a valid email address.")
+        
+        try:
+            admins = [t[1] for t in G_db_manager.get_admins()]
+        except Exception:
+            return rx.toast.error("Failed to fetch admins from the database.")
+        
+        if self.admin_entry.strip() in admins:
+            return rx.toast.error("Email already exists in the admin database.")
+        
     # clears search results and resets input fields
     def clear_results(self):
         self.results = []
@@ -180,7 +199,9 @@ class State(rx.State):
     """users page functions"""
     @rx.event(background=True)
     async def add_admin(self):
-        #validate email
+        
+        if a := self.validate_email(): return a
+
         async with self:
             self.is_populating = True
             start_time= time.time()
@@ -202,10 +223,21 @@ class State(rx.State):
     @rx.event(background=True)
     async def remove_admin(self, email: str):
 
+        email = email.strip()
+        if email == self.tokeninfo["email"]:
+            return rx.toast.error("cannot remove self as admin")
+        
+        try:
+            admin_count = len(G_db_manager.get_admins())
+        except Exception:
+            return rx.toast.error("Failed to fetch admins from the database.")
+        
+        if admin_count <= 4:
+            return rx.toast.error("there must be a minimum of four admins")
+
         async with self:
             self.is_removing = True
             start_time= time.time()
-
         try:
             G_db_manager.remove_admin(email)
         except Exception:
@@ -217,7 +249,6 @@ class State(rx.State):
             end_time= time.time()
 
         return rx.toast.success(f"removed {email} as an admin within {(end_time - start_time):.2f} seconds")
-
 
     @rx.var
     def get_admins(self) -> list[str]:
