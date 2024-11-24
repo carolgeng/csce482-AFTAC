@@ -104,6 +104,16 @@ def search_page() -> rx.Component:
                             rx.text(result.published),
                             spacing="1",
                         ),
+                        rx.hstack(
+                            rx.text("Citations: ", font_weight="bold"),
+                            rx.text(result.cit_count),
+                            spacing="1",
+                        ),
+                        rx.hstack(
+                            rx.text("Impact Score: ", font_weight="bold"),
+                            rx.text(result.im_score),
+                            spacing="1",
+                        ),
                         rx.cond(
                             result.journal_ref != "",
                             rx.hstack(
