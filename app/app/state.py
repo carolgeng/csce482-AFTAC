@@ -30,7 +30,6 @@ class State(rx.State):
 
     is_searching: bool = False
     is_populating: bool = False
-    is_training: bool = False
 
     #default, ascending, descending
     sort_date_mode: str = "default"
@@ -189,14 +188,6 @@ class State(rx.State):
 
         return rx.toast.success(f"Database populated with {num_articles_int} articles for query '{self.keywords}'.")
     
-    @rx.event(background=True)
-    async def retrain_model(self):
-        async with self:
-            self.is_training = True
-        RankModel().train_ml_model()
-        async with self:
-            self.is_training = False
-
 
 
 
@@ -349,22 +340,7 @@ class State(rx.State):
     @rx.var
     def no_results(self) -> bool:
         return self.is_searching or not self.original_results
-
-    @rx.var
-    def is_busy(self) -> bool:
-        """Returns True if the system is currently searching or training."""
-        return self.is_populating or self.is_training
-
-    @rx.var
-    def populate_button_color(self) -> str | None:
-        """Returns 'white' when populating is in progress."""
-        return "white" if self.is_populating else None
-
-    @rx.var
-    def retrain_button_color(self) -> str | None:
-        """Returns 'white' when training is in progress."""
-        return "white" if self.is_training else None
-        
+     
     #Google OAUTH functions
     @rx.var(cache=True)
     def email(self) -> str:

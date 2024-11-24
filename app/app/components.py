@@ -32,7 +32,7 @@ def navigation_bar(self) -> rx.Component:
                         button == "/search",
                         rx.button(
                             "Search",
-                            disabled=State.is_busy,
+                            disabled=State.is_populating,
                             background_color="red",
                             on_click=State.go_search,
                         )
