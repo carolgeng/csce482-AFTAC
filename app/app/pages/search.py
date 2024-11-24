@@ -1,7 +1,3 @@
-# this page is accesible to all users and displays the results from running the model 
-
-# could use rx.spinner() to load data 
-
 import reflex as rx
 from ..state import State
 from ..components import require_google_login, navigation_bar
@@ -66,22 +62,22 @@ def search_page() -> rx.Component:
 
             rx.hstack(
                  rx.button(
-                    "Sort by citation count",
-                    #on_click=State.clear_results,
+                    State.citation_label,
+                    on_click=State.sort_by_citation,
                     disabled=State.no_results,
                     background_color="green",
                     margin_top="10px"
                 ),
                 rx.button(
-                    State.sort_date_label,
+                    State.date_label,
                     on_click=State.sort_by_date,
                     disabled=State.no_results,
                     background_color="green",
                     margin_top="10px"
                 ),
                 rx.button(
-                    "Sort by impact score",
-                    #on_click=State.export_results_to_csv,
+                    State.score_label,
+                    on_click=State.sort_by_score,
                     disabled=State.no_results,
                     background_color="green",
                     margin_top="10px"

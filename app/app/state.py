@@ -1,6 +1,7 @@
 import os
 import reflex as rx
 from dotenv import load_dotenv
+from random import randint, random
 
 # for oauth
 import json
@@ -25,14 +26,21 @@ CLIENT_ID = os.getenv('CLIENT_ID')
 G_db_manager: DatabaseManager = DatabaseManager()
 
 class State(rx.State):
-    # for oauth use token instead of goole client secret 
     id_token_json: str = rx.LocalStorage()
 
     is_searching: bool = False
     is_populating: bool = False
     is_training: bool = False
 
-    sort_date_mode: str = "default" #default, ascending, descending
+    #default, ascending, descending
+    sort_date_mode: str = "default"
+    sort_citation_mode: str = "default"
+    sort_score_mode: str = "default"
+
+    date_label: str = "Sort by Date"
+    citation_label: str = "Sort by Citations"
+    score_label: str = "Sort by Impact Score"
+
     admin_entry: str = ""
 
     """State for managing user data and article search."""
@@ -146,14 +154,14 @@ class State(rx.State):
                 pdf_url=result['pdf_url'] or '#',
                 published=int(result['publication_year']) or -1,
                 journal_ref="",  # Update if journal references are available
-                cit_count=-1,
-                im_score=-1
+                cit_count=randint(0, 500),
+                im_score=random()
             )
             new_results.append(article)
             # Update the results and is_searching flag inside async with self
             async with self:
                 self.results = new_results
-                self.original_results = new_results#.copy()
+                self.original_results = new_results
                 self.is_searching = False
                 self.sort_date_mode = "default"
 
@@ -188,9 +196,13 @@ class State(rx.State):
         RankModel().train_ml_model()
         async with self:
             self.is_training = False
-        
+
+
+
+
     @rx.event()
     def sort_by_date(self):
+        self.reset_sort("date")
         """Sort the articles by date in ascending, descending, or original order."""
         # Helper function to parse the published date
         def parse_year(published_str):
@@ -203,6 +215,7 @@ class State(rx.State):
         if self.sort_date_mode == "default":
             # First click: sort ascending
             self.sort_date_mode = "ascending"
+            self.date_label = "Sort by date \u25bc"
             self.results = sorted(
                 self.results,
                 key=lambda article: parse_year(article.published)
@@ -210,6 +223,7 @@ class State(rx.State):
         elif self.sort_date_mode == "ascending":
             # Second click: sort descending
             self.sort_date_mode = "descending"
+            self.date_label = "Sort by Date \u25b2"
             self.results = sorted(
                 self.results,
                 key=lambda article: parse_year(article.published),
@@ -218,7 +232,101 @@ class State(rx.State):
         elif self.sort_date_mode == "descending":
             # Third click: return to original order
             self.sort_date_mode = "default"
+            self.date_label = "Sort by Date"
             self.results = self.original_results.copy()
+
+    @rx.event()
+    def sort_by_citation(self):
+        self.reset_sort("citation")
+        """Sort the articles by date in ascending, descending, or original order."""
+        # Helper function to parse the published date
+        def parse_citation(citation_str):
+            try:
+                return int(citation_str)
+            except ValueError:
+                return 0  # Use 0 for 'Unknown' or invalid years
+                
+
+        if self.sort_citation_mode == "default":
+            # First click: sort ascending
+            self.sort_citation_mode = "ascending"
+            self.citation_label = "Sort by Citations \u25bc"
+            self.results = sorted(
+                self.results,
+                key=lambda article: parse_citation(article.cit_count)
+            )
+        elif self.sort_citation_mode == "ascending":
+            # Second click: sort descending
+            self.sort_citation_mode = "descending"
+            self.citation_label = "Sort by Citations \u25b2"
+            self.results = sorted(
+                self.results,
+                key=lambda article: parse_citation(article.cit_count),
+                reverse=True
+            )
+        elif self.sort_citation_mode == "descending":
+            # Third click: return to original order
+            self.sort_citation_mode = "default"
+            self.citation_label = "Sort by Citations"
+            self.results = self.original_results.copy()
+
+    @rx.event()
+    def sort_by_score(self):
+        self.reset_sort("score")
+        """Sort the articles by date in ascending, descending, or original order."""
+        # Helper function to parse the published date
+        def parse_score(score_str):
+            try:
+                return float(score_str)
+            except ValueError:
+                return -1  # Use 0 for 'Unknown' or invalid years
+                
+
+        if self.sort_score_mode == "default":
+            # First click: sort ascending
+            self.sort_score_mode = "ascending"
+            self.score_label = "Sort by Impact Score \u25bc"
+            self.results = sorted(
+                self.results,
+                key=lambda article: parse_score(article.im_score)
+            )
+        elif self.sort_score_mode == "ascending":
+            # Second click: sort descending
+            self.sort_score_mode = "descending"
+            self.score_label = "Sort by Impact Score \u25b2"
+            self.results = sorted(
+                self.results,
+                key=lambda article: parse_score(article.im_score),
+                reverse=True
+            )
+        elif self.sort_score_mode == "descending":
+            # Third click: return to original order
+            self.sort_score_mode = "default"
+            self.score_label = "Sort by Impact Score"
+            self.results = self.original_results.copy()
+
+    def reset_sort(self, filter: str):
+        if filter == "date":
+            self.sort_citation_mode = "default"
+            self.citation_label = "Sort by Citations"
+
+            self.sort_score_mode = "default"
+            self.score_label = "Sort by Impact Score"
+
+        elif filter == "citation":
+            self.sort_date_mode = "default"
+            self.date_label = "Sort by Date"
+
+            self.sort_score_mode = "default"
+            self.score_label = "Sort by Impact Score"
+
+        elif filter == "score":
+            self.sort_citation_mode = "default"
+            self.citation_label = "Sort by Citations"
+
+            self.sort_date_mode = "default"
+            self.date_label = "Sort by Date"
+
 
     @rx.var
     def privileged_email(self) -> bool:
@@ -256,17 +364,7 @@ class State(rx.State):
     def retrain_button_color(self) -> str | None:
         """Returns 'white' when training is in progress."""
         return "white" if self.is_training else None
-    
-    @rx.var
-    def sort_date_label(self) -> str:
-        """Returns the label for the 'Sort by date' button with an arrow indicating the sort order."""
-        if self.sort_date_mode == "default":
-            return "Sort by date"
-        elif self.sort_date_mode == "ascending":
-            return "Sort by date \u25b2"
-        elif self.sort_date_mode == "descending":
-            return "Sort by date \u25bc"
-    
+        
     #Google OAUTH functions
     @rx.var(cache=True)
     def email(self) -> str:
