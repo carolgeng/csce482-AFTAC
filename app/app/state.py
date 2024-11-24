@@ -153,8 +153,8 @@ class State(rx.State):
                 pdf_url=result['pdf_url'] or '#',
                 published=int(result['publication_year']) or -1,
                 journal_ref="",  # Update if journal references are available
-                cit_count=randint(0, 500),
-                im_score=random()
+                cit_count=result["total_citations"],
+                im_score=result["impact_score"]
             )
             new_results.append(article)
             # Update the results and is_searching flag inside async with self
