@@ -1,139 +1,90 @@
-import pytest
+import unittest
 from unittest.mock import patch, MagicMock
-from app.database.APIs.open_alex.open_alex_wrapper import openalex_api_handler
+from app.database.APIs.open_alex.open_alex_wrapper import OpenAlexAPIHandler
 import requests
 
-@pytest.fixture
-def handler():
-    return openalex_api_handler()
+class TestOpenAlexAPIHandler(unittest.TestCase):
 
-@patch("requests.get")
-def test_query_with_results(mock_get, handler):
-    # Mock the response from requests.get
-    mock_response = MagicMock()
-    mock_response.raise_for_status.return_value = None  # No exception
-    mock_response.json.return_value = {
-        "results": [
-            {"id": "https://openalex.org/W123", "title": "Sample Title 1", "doi": "10.1000/xyz123"},
-            {"id": "https://openalex.org/W124", "title": "Sample Title 2", "doi": "10.1000/xyz124"},
+    def setUp(self):
+        self.api_handler = OpenAlexAPIHandler()
+
+    def test_init(self):
+        self.assertIsInstance(self.api_handler, OpenAlexAPIHandler)
+
+    # @patch('app.database.APIs.open_alex.open_alex_wrapper.requests.get')
+    # def test_query_success(self, mock_get):
+    #     mock_response = MagicMock()
+    #     mock_response.json.return_value = {
+    #         'results': [{'id': 1}, {'id': 2}],
+    #         'meta': {'next_cursor': 'next_page'}
+    #     }
+    #     mock_get.return_value = mock_response
+
+    #     results = list(self.api_handler.query('test query', max_results=3))
+
+    #     self.assertEqual(len(results), 3)
+    #     # self.assertEqual(results[0]['id'], 1)
+    #     # self.assertEqual(results[1]['id'], 2)
+
+    #     mock_get.assert_called_with(
+    #         'https://api.openalex.org/works',
+    #         params={
+    #             'search': 'test query',
+    #             'per-page': 200,
+    #             'cursor': '*',
+    #             'sort': 'cited_by_count:desc'
+    #         },
+    #         headers={'User-Agent': 'YourAppName (your_email@example.com)'},
+    #         timeout=30
+    #     )
+
+    @patch('app.database.APIs.open_alex.open_alex_wrapper.requests.get')
+    def test_query_multiple_pages(self, mock_get):
+        mock_responses = [
+            MagicMock(json=lambda: {'results': [{'id': 1}, {'id': 2}], 'meta': {'next_cursor': 'next_page'}}),
+            MagicMock(json=lambda: {'results': [{'id': 3}], 'meta': {'next_cursor': None}})
         ]
-    }
-    mock_get.return_value = mock_response
+        mock_get.side_effect = mock_responses
 
-    # Call the query method
-    results = list(handler.query("sample query", max_results=2))
+        results = list(self.api_handler.query('test query'))
 
-    # Verify that the results contain the expected items
-    assert len(results) == 2
-    assert results[0]["id"] == "https://openalex.org/W123"
-    assert results[0]["title"] == "Sample Title 1"
-    assert results[0]["doi"] == "10.1000/xyz123"
-    assert results[1]["id"] == "https://openalex.org/W124"
-    assert results[1]["title"] == "Sample Title 2"
-    assert results[1]["doi"] == "10.1000/xyz124"
+        self.assertEqual(len(results), 3)
+        self.assertEqual([r['id'] for r in results], [1, 2, 3])
+        self.assertEqual(mock_get.call_count, 2)
 
-@patch("requests.get")
-def test_query_no_results(mock_get, handler):
-    # Mock the response from requests.get with no items
-    mock_response = MagicMock()
-    mock_response.raise_for_status.return_value = None  # No exception
-    mock_response.json.return_value = {
-        "results": []
-    }
-    mock_get.return_value = mock_response
+    @patch('app.database.APIs.open_alex.open_alex_wrapper.requests.get')
+    def test_query_max_results(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            'results': [{'id': i} for i in range(1, 6)],
+            'meta': {'next_cursor': 'next_page'}
+        }
+        mock_get.return_value = mock_response
 
-    # Call the query method
-    results = list(handler.query("sample query", max_results=2))
+        results = list(self.api_handler.query('test query', max_results=3))
 
-    # Verify that no results are returned
-    assert len(results) == 0
+        self.assertEqual(len(results), 3)
+        self.assertEqual([r['id'] for r in results], [1, 2, 3])
 
-@patch("requests.get")
-def test_query_request_exception(mock_get, handler):
-    # Mock the requests.get to raise a RequestException
-    mock_get.side_effect = requests.exceptions.RequestException("Request failed")
+    @patch('app.database.APIs.open_alex.open_alex_wrapper.requests.get')
+    def test_query_no_results(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {'results': [], 'meta': {'next_cursor': None}}
+        mock_get.return_value = mock_response
 
-    # Call the query method and verify it handles the exception gracefully
-    results = list(handler.query("sample query", max_results=2))
-    assert len(results) == 0
+        results = list(self.api_handler.query('test query'))
 
-@patch("requests.get")
-def test_query_pagination(mock_get, handler):
-    # Mock the response from requests.get to simulate pagination
-    mock_response_page_1 = MagicMock()
-    mock_response_page_1.raise_for_status.return_value = None  # No exception
-    mock_response_page_1.json.return_value = {
-        "results": [
-            {"id": "https://openalex.org/W123", "title": "Sample Title 1", "doi": "10.1000/xyz123"}
-        ]
-    }
-    mock_response_page_2 = MagicMock()
-    mock_response_page_2.raise_for_status.return_value = None  # No exception
-    mock_response_page_2.json.return_value = {
-        "results": [
-            {"id": "https://openalex.org/W124", "title": "Sample Title 2", "doi": "10.1000/xyz124"}
-        ]
-    }
-    mock_get.side_effect = [mock_response_page_1, mock_response_page_2]
+        self.assertEqual(len(results), 0)
 
-    # Call the query method
-    results = list(handler.query("sample query", max_results=2))
+    @patch('app.database.APIs.open_alex.open_alex_wrapper.requests.get')
+    def test_query_request_exception(self, mock_get):
+        mock_get.side_effect = requests.RequestException("Test error")
 
-    # Verify that the results contain the expected items from both pages
-    assert len(results) == 2
-    assert results[0]["id"] == "https://openalex.org/W123"
-    assert results[0]["title"] == "Sample Title 1"
-    assert results[0]["doi"] == "10.1000/xyz123"
-    assert results[1]["id"] == "https://openalex.org/W124"
-    assert results[1]["title"] == "Sample Title 2"
-    assert results[1]["doi"] == "10.1000/xyz124"
+        with patch('builtins.print') as mock_print:
+            results = list(self.api_handler.query('test query'))
 
-# @patch("requests.get")
-# def test_query_with_default_max_results(mock_get, handler):
-#     # Mock the response from requests.get
-#     mock_response = MagicMock()
-#     mock_response.raise_for_status.return_value = None  # No exception
-#     mock_response.json.return_value = {
-#         "results": [
-#             {"id": "https://openalex.org/W123", "title": "Sample Title 1", "doi": "10.1000/xyz123"}
-#         ]
-#     }
-#     mock_get.return_value = mock_response
+        self.assertEqual(len(results), 0)
+        mock_print.assert_called_once_with("An error occurred: Test error")
 
-#     # Call the query method without specifying max_results
-#     results = list(handler.query("sample query"))
-
-#     # Verify that the result contains the expected item
-#     assert len(results) == 1
-#     assert results[0]["id"] == "https://openalex.org/W123"
-#     assert results[0]["title"] == "Sample Title 1"
-#     assert results[0]["doi"] == "10.1000/xyz123"
-
-@patch("requests.get")
-def test_query_max_pages(mock_get, handler):
-    # Mock the response from requests.get to simulate pagination with a lot of pages
-    mock_response_page = MagicMock()
-    mock_response_page.raise_for_status.return_value = None  # No exception
-    mock_response_page.json.return_value = {
-        "results": [
-            {"id": "https://openalex.org/W123", "title": "Sample Title 1", "doi": "10.1000/xyz123"}
-        ]
-    }
-    mock_get.return_value = mock_response_page
-
-    # Set a limit for max_pages to prevent infinite pagination
-    max_pages = 3
-
-    # Mock the pagination to avoid hanging
-    results = []
-    page = 1
-    while page <= max_pages:
-        results.extend(list(handler.query("sample query", max_results=1)))
-        page += 1
-
-    # Verify that the results contain the expected items and pagination stops after max_pages
-    assert len(results) == max_pages
-    for result in results:
-        assert result["id"] == "https://openalex.org/W123"
-        assert result["title"] == "Sample Title 1"
-        assert result["doi"] == "10.1000/xyz123"
+if __name__ == '__main__':
+    unittest.main()

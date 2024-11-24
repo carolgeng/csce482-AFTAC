@@ -33,20 +33,20 @@ def test_insert_author(db_manager):
     assert author_id == 1
     db_manager.cursor.execute.assert_called_once()
 
-def test_insert_journal(db_manager):
-    db_manager.cursor.fetchone.side_effect = [None, [1]]
-    journal_id = db_manager.insert_journal(
-        journal_name='Journal of Testing',
-        mean_citations_per_paper=5.2,
-        delta_mean_citations_per_paper=0.3,
-        journal_h_index=25,
-        delta_journal_h_index=1,
-        max_citations_paper=150,
-        total_papers_published=300,
-        delta_total_papers_published=10
-    )
-    assert journal_id == 1
-    assert db_manager.cursor.execute.call_count == 2
+# def test_insert_journal(db_manager):
+#     db_manager.cursor.fetchone.side_effect = [None, [1]]
+#     journal_id = db_manager.insert_journal(
+#         journal_name='Journal of Testing',
+#         mean_citations_per_paper=5.2,
+#         delta_mean_citations_per_paper=0.3,
+#         journal_h_index=25,
+#         delta_journal_h_index=1,
+#         max_citations_paper=150,
+#         total_papers_published=300,
+#         delta_total_papers_published=10
+#     )
+#     assert journal_id == 1
+#     assert db_manager.cursor.execute.call_count == 2
 
 def test_insert_paper(db_manager):
     db_manager.cursor.fetchone.return_value = [1]

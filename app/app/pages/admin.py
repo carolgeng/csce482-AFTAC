@@ -2,18 +2,22 @@
 
 import reflex as rx
 from ..state import State
-from ..components import require_google_login, user_info, login
+from ..components import require_google_login, navigation_bar, login, require_privilege
 
-@rx.page(route="/admin")
+@rx.page(route="/admin",on_load=State.unprivileged_redirect)
 @require_google_login
+@require_privilege
 def admin_page() -> rx.Component:
     """The admin page where users can search for articles."""
     return rx.container(
         rx.color_mode.button(position="top-right"),
         rx.vstack(
-            rx.heading("AFTAC: AI Driven R&D", size="2xl"),
+            rx.hstack(
+                navigation_bar(State.tokeninfo)
+            ),
+            # rx.heading("AFTAC: AI Driven R&D", size="2xl"),
             rx.text(
-                "Enter keywords to find relevant articles.",
+                "Enter keywords to populate the database.",
                 font_size="lg"
             ),
             # Input box for keyword search
@@ -35,25 +39,15 @@ def admin_page() -> rx.Component:
             rx.hstack(
                 rx.button(
                     "Populate Database",
+                    rx.spinner(loading=State.is_populating),
+                    disabled=State.is_populating,
                     background_color="blue",
+                    color="white",
                     on_click=State.populate_database,
                     margin_top="10px"
                 ),
-                rx.button(
-                    "Retrain Model",
-                    background_color="green",
-                    on_click=State.retrain_model,
-                    margin_top="10px"
-                )
             ),
-            rx.hstack(
-                rx.button(
-                    "Back",
-                    background_color="red",
-                    on_click=rx.redirect("/user"),
-                    margin_top="10px"
-                ),
-            ),
+            
             # Display results
             rx.vstack(
                 rx.foreach(
@@ -69,19 +63,6 @@ def admin_page() -> rx.Component:
                             rx.text("Published: ", font_weight="bold"),
                             rx.text(result.published),
                             spacing="1",
-                        ),
-                        rx.cond(
-                            result.comment != "",
-                            rx.hstack(
-                                rx.text("Comments: ", font_weight="bold"),
-                                rx.text(result.comment),
-                                spacing="1",
-                            ),
-                            rx.hstack(
-                                rx.text("Comments: ", font_weight="bold"),
-                                rx.text("No comments"),
-                                spacing="1",
-                            )
                         ),
                         rx.cond(
                             result.journal_ref != "",
@@ -114,8 +95,5 @@ def admin_page() -> rx.Component:
                 align_items="start",
                 margin_top="20px"
             ),
-            spacing="5",
-            justify="center",
-            min_height="85vh",
         ),
     )

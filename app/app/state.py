@@ -1,61 +1,347 @@
+import os
+import reflex as rx
+from dotenv import load_dotenv
+from random import randint, random
 
 # for oauth
 import json
-import os
 import time
 from google.auth.transport import requests
 from google.oauth2.id_token import verify_oauth2_token
-from dotenv import load_dotenv
+
+# for article serach app
+from .article import Article
+from model.RankModel import RankModel
+from database.populate_db import DatabaseSearchService
+from database.DatabaseManager import DatabaseManager
 
 # to export csv
 import csv
 from io import StringIO
 
-# for article serach app
-import reflex as rx
-from database.APIs.arXiv.arXiv_wrapper import api_handler
-from datetime import datetime
-from model.RankModel import RankModel
-from database.populate_db import DatabaseSearchService
-
 # gets client id from env file
 load_dotenv()
 CLIENT_ID = os.getenv('CLIENT_ID')
 
-
-# structure that holds the contents of the search results 
-class Article(rx.Base):
-    title: str
-    authors: str
-    summary: str
-    pdf_url: str
-    published: str
-    comment: str = ""
-    journal_ref: str = ""
-    publication_year: int = 0
-    delta_citations: float = 0
-    journal_h_index: float = 0.0
-    mean_citations_per_paper: float = 0.0
-    total_papers_published: float = 0.0
-    num_authors: int = 0
-    avg_author_h_index: float = 0.0
-    avg_author_total_papers: float = 0.0
-    avg_author_total_citations: float = 0.0
-    total_citations: int = 0
-    impact_score: float = 0.0 
-
+G_db_manager: DatabaseManager = DatabaseManager()
 
 class State(rx.State):
-
-    # for oauth use token instead of goole client secret 
     id_token_json: str = rx.LocalStorage()
 
-    def on_success(self, id_token: dict):
-        """Handle successful login and store the ID token."""
-        self.id_token_json = json.dumps(id_token)
-        return rx.redirect("/user")
+    is_searching: bool = False
+    is_populating: bool = False
+
+    #default, ascending, descending
+    sort_date_mode: str = "default"
+    sort_citation_mode: str = "default"
+    sort_score_mode: str = "default"
+
+    date_label: str = "Sort by Date"
+    citation_label: str = "Sort by Citations"
+    score_label: str = "Sort by Impact Score"
+
+    admin_entry: str = ""
+
+    """State for managing user data and article search."""
+    # store the user's input keywords
+    keywords: str = ""
+    # store the user's desired number of articles as a string
+    num_articles: str = "" 
+    # store the search results as a list of Article models
+    original_results: list[Article] = []
+    results: list[Article] = []
+
+    def validate_input(self):
+        """Handle the click of the search button with input validation."""
+        if not self.keywords.strip():
+            return rx.toast.warning("Keywords cannot be empty.")
+        if not self.num_articles.strip():
+            return rx.toast.warning("Number of articles cannot be empty.")
+        try:
+            num_articles_int = int(self.num_articles)
+            if num_articles_int <= 0:
+                return rx.toast.warning("Number of articles must be a positive integer.")
+        except ValueError:
+            return rx.toast.warning("Number of articles must be an integer.")
+
+    @rx.event()
+    def set_keywords(self, value: str):
+        """Set the search keywords."""
+        self.keywords = value
+
+    @rx.event()
+    def set_num_articles(self, value: str):
+        """Set the number of articles."""
+        self.num_articles = value
+
+    def go_admin_page(self):
+        self.clear_results()
+        return rx.redirect("/admin")
+
+    def go_search(self):
+        self.clear_results()
+        return rx.redirect("/search")
+    
+    def go_users(self):
+        self.clear_results()
+        return rx.redirect("/users")
+
+    def clear_results(self):
+        """Clear the search results and reset input fields."""
+        self.results = []
+        self.original_results = []
+        self.keywords = ""
+        self.num_articles = ""
+        self.sort_date_mode = "default"
+        self.admin_entry = ""
+
+    @rx.var
+    def get_admins(self) -> list[str]:
+        try:
+            return [t[1] for t in G_db_manager.get_admins()]
+        except Exception:
+            return rx.toast.error("Failed to display admins")
+    
+    @rx.event()
+    def set_admin_entry(self, value: str):
+        """Set the number of articles."""
+        self.admin_entry = value
+
+    @rx.event
+    def add_admin(self):
+        G_db_manager.insert_admin(self.admin_entry)
+        self.clear_results()
+
+    @rx.event
+    def remove_admin(self, email: str):
+        G_db_manager.remove_admin(email)
+
+    #UI components functions
+    @rx.event(background=True)
+    async def search_articles(self):
+        """Function to handle article search and ranking."""
+        if a := self.validate_input(): return a
+
+        async with self:
+            self.is_searching = True
+        
+
+        num_articles_int = int(self.num_articles)
+
+        rank_model = RankModel()
+        # Get ranked articles from the model
+        ranked_articles = rank_model.rank_articles(self.keywords, num_articles=num_articles_int)
+
+        # Build up a new list to store articles
+        new_results = []
+
+        if ranked_articles.empty:
+            async with self:
+                self.results = []
+                self.is_searching = False
+            return rx.toast.error("No articles found for the given query.")
+
+        for _, result in ranked_articles.iterrows():
+            # Filter out None values in authors
+            authors_list = [a for a in result['authors'] if a] if result['authors'] else []
+            authors_str = ', '.join(authors_list) if authors_list else 'Unknown'
+
+            article = Article(
+                title=result['title'],
+                authors=authors_str,
+                summary=result['abstract'] or 'No abstract available.',
+                pdf_url=result['pdf_url'] or '#',
+                published=int(result['publication_year']) or -1,
+                journal_ref="",  # Update if journal references are available
+                cit_count=randint(0, 500),
+                im_score=random()
+            )
+            new_results.append(article)
+            # Update the results and is_searching flag inside async with self
+            async with self:
+                self.results = new_results
+                self.original_results = new_results
+                self.is_searching = False
+                self.sort_date_mode = "default"
+
+        return rx.toast.success(f"fetched {len(self.results)} articles!")
+
+    @rx.event(background=True)
+    async def populate_database(self):
+
+        if a := self.validate_input(): return a
+
+        async with self:
+            self.is_populating = True
+
+        num_articles_int = int(self.num_articles)
+        
+        # Initialize the DatabaseSearchService with the query (keywords) and number of articles
+        search_service = DatabaseSearchService(query=self.keywords, num_articles=num_articles_int)
+
+        # Run the search and store the results in the databases
+        search_service.search_and_store()
+        
+        async with self:
+            self.clear_results()
+            self.is_populating = False
+
+        return rx.toast.success(f"Database populated with {num_articles_int} articles for query '{self.keywords}'.")
+    
 
 
+
+    @rx.event()
+    def sort_by_date(self):
+        self.reset_sort("date")
+        """Sort the articles by date in ascending, descending, or original order."""
+        # Helper function to parse the published date
+        def parse_year(published_str):
+            try:
+                return int(published_str)
+            except ValueError:
+                return 0  # Use 0 for 'Unknown' or invalid years
+                
+
+        if self.sort_date_mode == "default":
+            # First click: sort ascending
+            self.sort_date_mode = "ascending"
+            self.date_label = "Sort by date \u25bc"
+            self.results = sorted(
+                self.results,
+                key=lambda article: parse_year(article.published)
+            )
+        elif self.sort_date_mode == "ascending":
+            # Second click: sort descending
+            self.sort_date_mode = "descending"
+            self.date_label = "Sort by Date \u25b2"
+            self.results = sorted(
+                self.results,
+                key=lambda article: parse_year(article.published),
+                reverse=True
+            )
+        elif self.sort_date_mode == "descending":
+            # Third click: return to original order
+            self.sort_date_mode = "default"
+            self.date_label = "Sort by Date"
+            self.results = self.original_results.copy()
+
+    @rx.event()
+    def sort_by_citation(self):
+        self.reset_sort("citation")
+        """Sort the articles by date in ascending, descending, or original order."""
+        # Helper function to parse the published date
+        def parse_citation(citation_str):
+            try:
+                return int(citation_str)
+            except ValueError:
+                return 0  # Use 0 for 'Unknown' or invalid years
+                
+
+        if self.sort_citation_mode == "default":
+            # First click: sort ascending
+            self.sort_citation_mode = "ascending"
+            self.citation_label = "Sort by Citations \u25bc"
+            self.results = sorted(
+                self.results,
+                key=lambda article: parse_citation(article.cit_count)
+            )
+        elif self.sort_citation_mode == "ascending":
+            # Second click: sort descending
+            self.sort_citation_mode = "descending"
+            self.citation_label = "Sort by Citations \u25b2"
+            self.results = sorted(
+                self.results,
+                key=lambda article: parse_citation(article.cit_count),
+                reverse=True
+            )
+        elif self.sort_citation_mode == "descending":
+            # Third click: return to original order
+            self.sort_citation_mode = "default"
+            self.citation_label = "Sort by Citations"
+            self.results = self.original_results.copy()
+
+    @rx.event()
+    def sort_by_score(self):
+        self.reset_sort("score")
+        """Sort the articles by date in ascending, descending, or original order."""
+        # Helper function to parse the published date
+        def parse_score(score_str):
+            try:
+                return float(score_str)
+            except ValueError:
+                return -1  # Use 0 for 'Unknown' or invalid years
+                
+
+        if self.sort_score_mode == "default":
+            # First click: sort ascending
+            self.sort_score_mode = "ascending"
+            self.score_label = "Sort by Impact Score \u25bc"
+            self.results = sorted(
+                self.results,
+                key=lambda article: parse_score(article.im_score)
+            )
+        elif self.sort_score_mode == "ascending":
+            # Second click: sort descending
+            self.sort_score_mode = "descending"
+            self.score_label = "Sort by Impact Score \u25b2"
+            self.results = sorted(
+                self.results,
+                key=lambda article: parse_score(article.im_score),
+                reverse=True
+            )
+        elif self.sort_score_mode == "descending":
+            # Third click: return to original order
+            self.sort_score_mode = "default"
+            self.score_label = "Sort by Impact Score"
+            self.results = self.original_results.copy()
+
+    def reset_sort(self, filter: str):
+        if filter == "date":
+            self.sort_citation_mode = "default"
+            self.citation_label = "Sort by Citations"
+
+            self.sort_score_mode = "default"
+            self.score_label = "Sort by Impact Score"
+
+        elif filter == "citation":
+            self.sort_date_mode = "default"
+            self.date_label = "Sort by Date"
+
+            self.sort_score_mode = "default"
+            self.score_label = "Sort by Impact Score"
+
+        elif filter == "score":
+            self.sort_citation_mode = "default"
+            self.citation_label = "Sort by Citations"
+
+            self.sort_date_mode = "default"
+            self.date_label = "Sort by Date"
+
+
+    @rx.var
+    def privileged_email(self) -> bool:
+        email = self.email
+        return email in self.get_admins
+
+    @rx.var
+    def valid_buttons(self) -> list[str]:
+        page_names: list[str] = ["/search"]
+
+        if self.privileged_email:
+            page_names += ["/admin", "/users"]
+        try:
+            page_names.remove(self.router_data["pathname"])
+        except:
+            pass
+        return page_names
+
+
+    @rx.var
+    def no_results(self) -> bool:
+        return self.is_searching or not self.original_results
+     
+    #Google OAUTH functions
     @rx.var(cache=True)
     def email(self) -> str:
         """Extract the user's email from tokeninfo."""
@@ -79,12 +365,6 @@ class State(rx.State):
                 print(f"Error verifying token: {exc}")
         return {}
 
-    def logout(self):
-        """Log the user out by clearing the ID token."""
-        self.id_token_json = ""
-        self.clear_results()
-        return rx.redirect("/")
-
     @rx.var
     def token_is_valid(self) -> bool:
         """Check if the user's token is valid."""
@@ -96,75 +376,30 @@ class State(rx.State):
             )
         except Exception:
             return False
+        
+    def on_login_success(self, id_token: dict):
+        """Handle successful login and store the ID token."""
+        self.id_token_json = json.dumps(id_token)
+        if self.privileged_email:
+            return rx.redirect("/admin")
+        return rx.redirect("/search")
+    
+    def logout(self):
+        """Log the user out by clearing the ID token."""
+        self.id_token_json = ""
+        self.clear_results()
+        return rx.redirect("/")
 
-    """State for managing user data and article search."""
-    # store the user's input keywords
-    keywords: str = ""
-    # store the user's desired number of articles as a string
-    num_articles: str = "10"  # Default value
-    # store the search results as a list of Article models
-    results: list[Article] = []
+    def unprivileged_redirect(self):
+        if not self.privileged_email:
+            return rx.redirect("/search")
+        
+    def on_login_page(self):
+        if self.token_is_valid:
+            return rx.redirect("/search")
 
-    def set_keywords(self, value):
-        """Set the search keywords."""
-        self.keywords = value
-
-    def set_num_articles(self, value):
-        """Set the number of articles."""
-        self.num_articles = value
-
-    def search_articles(self):
-        """Function to handle article search and ranking."""
-        try:
-            num_articles_int = int(self.num_articles)
-        except ValueError:
-            num_articles_int = 10  # Default or handle error
-
-        rank_model = RankModel()
-        # Get ranked articles from the model
-        ranked_articles = rank_model.rank_articles(self.keywords, num_articles=num_articles_int)
-
-        # Initialize an empty list to store articles
-        self.results = []
-
-        if ranked_articles.empty:
-            print("No articles found for the given query.")
-            return
-
-        for _, result in ranked_articles.iterrows():
-            # Filter out None values in authors
-            authors_list = [a for a in result['authors'] if a] if result['authors'] else []
-            authors_str = ', '.join(authors_list) if authors_list else 'Unknown'
-
-            article = Article(
-                title=result['title'],
-                authors=authors_str,
-                summary=result['abstract'] or 'No abstract available.',
-                pdf_url=result['pdf_url'] or '#',
-                published=str(result['publication_year']) or 'Unknown',
-                comment="",  # Update if comments are available
-                journal_ref="",  # Update if journal references are available
-                publication_year=int(result['publication_year']) if result['publication_year'] else 0,
-                delta_citations=float(result['delta_citations']) if result['delta_citations'] else 0,
-                journal_h_index = float(result['journal_h_index']) if result['journal_h_index'] else 0,
-                mean_citations_per_paper=float(result['mean_citations_per_paper']) if result['mean_citations_per_paper'] else 0.0,
-                total_papers_published=float(result['total_papers_published']) if result['total_papers_published'] else 0,
-                num_authors=int(result['num_authors']) if result['num_authors'] else 0,
-                avg_author_h_index=float(result['avg_author_h_index']) if result['avg_author_h_index'] else 0.0,
-                avg_author_total_papers=float(result['avg_author_total_papers']) if result['avg_author_total_papers'] else 0.0,
-                avg_author_total_citations=float(result['avg_author_total_citations']) if result['avg_author_total_citations'] else 0.0,
-                total_citations=int(result['total_citations']) if result['total_citations'] else 0,
-                impact_score=float(result['impact_score']) if result['impact_score'] else 0.0,  
-            )
-            self.results.append(article)
-
-    def clear_results(self):
-        """Clear the search results and reset input fields."""
-        self.results = []
-        self.keywords = ""
-        self.num_articles = "10"
-
-    @rx.event
+    #export CSV functions
+    @rx.event()
     def export_results_to_csv(self):
         """Export search results to a CSV with title, authors, and published date."""
         if not self.results:
@@ -193,22 +428,3 @@ class State(rx.State):
             data=output.getvalue(),
             filename=filename,
         )
-    
-    def populate_database(self):
-        try:
-            num_articles_int = int(self.num_articles)
-        except ValueError:
-            num_articles_int = 10  # Default or handle error
-        # Initialize the DatabaseSearchService with the query (keywords) and number of articles
-        search_service = DatabaseSearchService(query=self.keywords, num_articles=num_articles_int)
-
-        # Run the search and store the results in the databases
-        search_service.search_and_store()
-
-        print(f"Database populated with {num_articles_int} articles for query '{self.keywords}'.")
-
-        # Optionally clear results or reset fields after population
-        self.clear_results()
-
-    def retrain_model(self):
-        RankModel().train_ml_model()
