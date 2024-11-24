@@ -1,7 +1,6 @@
 import os
 import reflex as rx
 from dotenv import load_dotenv
-from random import randint, random
 
 # for oauth
 import json
@@ -12,68 +11,48 @@ from google.oauth2.id_token import verify_oauth2_token
 # for article serach app
 from .article import Article
 from model.RankModel import RankModel
-from database.populate_db import DatabaseSearchService
 from database.DatabaseManager import DatabaseManager
+from database.populate_db import DatabaseSearchService
 
 # to export csv
 import csv
 from io import StringIO
 
-# gets client id from env file
 load_dotenv()
 CLIENT_ID = os.getenv('CLIENT_ID')
 
 G_db_manager: DatabaseManager = DatabaseManager()
 
 class State(rx.State):
+    # Google OAUTH token
     id_token_json: str = rx.LocalStorage()
 
+    # shared between the admin and search pages
+    keywords: str = ""
+    num_articles: str = "" 
+    results: list[Article] = []
+    original_results: list[Article] = []
+
+    # states to control button access in both search and admin pages
     is_searching: bool = False
     is_populating: bool = False
 
-    #default, ascending, descending
+    # sort states: default, ascending, descending
     sort_date_mode: str = "default"
-    sort_citation_mode: str = "default"
     sort_score_mode: str = "default"
-
+    sort_citation_mode: str = "default"
+    
+    # sorting labels
     date_label: str = "Sort by Date"
     citation_label: str = "Sort by Citations"
     score_label: str = "Sort by Impact Score"
 
+    # admin entry field on users page
     admin_entry: str = ""
 
-    """State for managing user data and article search."""
-    # store the user's input keywords
-    keywords: str = ""
-    # store the user's desired number of articles as a string
-    num_articles: str = "" 
-    # store the search results as a list of Article models
-    original_results: list[Article] = []
-    results: list[Article] = []
+    
 
-    def validate_input(self):
-        """Handle the click of the search button with input validation."""
-        if not self.keywords.strip():
-            return rx.toast.warning("Keywords cannot be empty.")
-        if not self.num_articles.strip():
-            return rx.toast.warning("Number of articles cannot be empty.")
-        try:
-            num_articles_int = int(self.num_articles)
-            if num_articles_int <= 0:
-                return rx.toast.warning("Number of articles must be a positive integer.")
-        except ValueError:
-            return rx.toast.warning("Number of articles must be an integer.")
-
-    @rx.event()
-    def set_keywords(self, value: str):
-        """Set the search keywords."""
-        self.keywords = value
-
-    @rx.event()
-    def set_num_articles(self, value: str):
-        """Set the number of articles."""
-        self.num_articles = value
-
+    """page redirect functions"""
     def go_admin_page(self):
         self.clear_results()
         return rx.redirect("/admin")
@@ -86,60 +65,63 @@ class State(rx.State):
         self.clear_results()
         return rx.redirect("/users")
 
+    # input validation for search and admin pages
+    def validate_input(self):
+        if not self.keywords.strip():
+            return rx.toast.warning("Keywords cannot be empty.")
+        if not self.num_articles.strip():
+            return rx.toast.warning("Number of articles cannot be empty.")
+        try:
+            num_articles_int = int(self.num_articles)
+            if num_articles_int <= 0:
+                return rx.toast.warning("Number of articles must be a positive integer.")
+        except ValueError:
+            return rx.toast.warning("Number of articles must be an integer.")
+
+    # clears search results and resets input fields
     def clear_results(self):
-        """Clear the search results and reset input fields."""
         self.results = []
         self.original_results = []
         self.keywords = ""
         self.num_articles = ""
-        self.sort_date_mode = "default"
         self.admin_entry = ""
+        self.reset_sort()
 
-    @rx.var
-    def get_admins(self) -> list[str]:
-        try:
-            return [t[1] for t in G_db_manager.get_admins()]
-        except Exception:
-            return rx.toast.error("Failed to display admins")
-    
+    @rx.event()
+    def set_keywords(self, value: str):
+        self.keywords = value
+
+    @rx.event()
+    def set_num_articles(self, value: str):
+        self.num_articles = value
+
     @rx.event()
     def set_admin_entry(self, value: str):
-        """Set the number of articles."""
         self.admin_entry = value
-
-    @rx.event
-    def add_admin(self):
-        G_db_manager.insert_admin(self.admin_entry)
-        self.clear_results()
-
-    @rx.event
-    def remove_admin(self, email: str):
-        G_db_manager.remove_admin(email)
-
+    
+    
     #UI components functions
     @rx.event(background=True)
     async def search_articles(self):
-        """Function to handle article search and ranking."""
         if a := self.validate_input(): return a
 
         async with self:
             self.is_searching = True
+            start_time=time.time()
         
-
         num_articles_int = int(self.num_articles)
 
-        rank_model = RankModel()
-        # Get ranked articles from the model
+        rank_model = RankModel() # Get ranked articles from the model
         ranked_articles = rank_model.rank_articles(self.keywords, num_articles=num_articles_int)
 
-        # Build up a new list to store articles
-        new_results = []
+        new_results = []  # build up a new list to store articles
 
         if ranked_articles.empty:
             async with self:
                 self.results = []
                 self.is_searching = False
-            return rx.toast.error("No articles found for the given query.")
+                end_time=time.time()
+            return rx.toast.error(f"No articles found for the given query in {end_time-start_time} seconds.")
 
         for _, result in ranked_articles.iterrows():
             # Filter out None values in authors
@@ -152,45 +134,67 @@ class State(rx.State):
                 summary=result['abstract'] or 'No abstract available.',
                 pdf_url=result['pdf_url'] or '#',
                 published=int(result['publication_year']) or -1,
-                journal_ref=result['journal_name'] or 'No Journal available',  # Update if journal references are available
-                cit_count=result["total_citations"],
-                im_score=result["impact_score"]
+                journal_ref=result['journal_name'] or 'No Journal available',
+                cit_count=int(result["total_citations"]),
+                im_score=float(result["impact_score"])
             )
             new_results.append(article)
-            # Update the results and is_searching flag inside async with self
+
+            # Update the results and is_searching flag
             async with self:
                 self.results = new_results
                 self.original_results = new_results
                 self.is_searching = False
-                self.sort_date_mode = "default"
+                end_time=time.time()
+                self.reset_sort()
+                
 
-        return rx.toast.success(f"fetched {len(self.results)} articles!")
+        return rx.toast.success(f"fetched {len(self.results)} articles in {end_time-start_time} seconds!")
 
     @rx.event(background=True)
     async def populate_database(self):
-
         if a := self.validate_input(): return a
+
+        num_articles_int = int(self.num_articles)
+        if num_articles_int  > 100: 
+            return rx.toast.warning("insert no more than 100 papers at a time")
 
         async with self:
             self.is_populating = True
+            start_time= time.time()
 
-        num_articles_int = int(self.num_articles)
-        
         # Initialize the DatabaseSearchService with the query (keywords) and number of articles
-        search_service = DatabaseSearchService(query=self.keywords, num_articles=num_articles_int)
-
-        # Run the search and store the results in the databases
-        search_service.search_and_store()
+        search_service = DatabaseSearchService(query=self.keywords, num_articles=(num_articles_int//4)) # we have 4 APIs... This is not the best way to do it
+ 
+        search_service.search_and_store() # Run the search and store the results in the databases
         
         async with self:
             self.clear_results()
             self.is_populating = False
+            end_time= time.time()
 
-        return rx.toast.success(f"Database populated with {num_articles_int} articles for query '{self.keywords}'.")
+        return rx.toast.success(f"Database populated with {num_articles_int} articles for query '{self.keywords}' in {(end_time - start_time):.2f} seconds.")
     
 
+    """users page functions"""
+    @rx.event()
+    def add_admin(self):
+        G_db_manager.insert_admin(self.admin_entry)
+        self.clear_results()
 
+    @rx.event()
+    def remove_admin(self, email: str):
+        G_db_manager.remove_admin(email)
 
+    @rx.var
+    def get_admins(self) -> list[str]:
+        try:
+            return [t[1] for t in G_db_manager.get_admins()]
+        except Exception:
+            return rx.toast.error("Failed to display admins")
+    
+
+    """sort functionality on search page"""
     @rx.event()
     def sort_by_date(self):
         self.reset_sort("date")
@@ -296,7 +300,7 @@ class State(rx.State):
             self.score_label = "Sort by Impact Score"
             self.results = self.original_results.copy()
 
-    def reset_sort(self, filter: str):
+    def reset_sort(self, filter: str = None):
         if filter == "date":
             self.sort_citation_mode = "default"
             self.citation_label = "Sort by Citations"
@@ -318,12 +322,22 @@ class State(rx.State):
             self.sort_date_mode = "default"
             self.date_label = "Sort by Date"
 
+        else:
+            self.sort_citation_mode = "default"
+            self.citation_label = "Sort by Citations"
+
+            self.sort_score_mode = "default"
+            self.score_label = "Sort by Impact Score"
+
+            self.sort_date_mode = "default"
+            self.date_label = "Sort by Date"
+
+
 
     @rx.var
-    def privileged_email(self) -> bool:
-        email = self.email
-        return email in self.get_admins
-
+    def no_results(self) -> bool:
+        return self.is_searching or not self.original_results
+     
     @rx.var
     def valid_buttons(self) -> list[str]:
         page_names: list[str] = ["/search"]
@@ -335,23 +349,24 @@ class State(rx.State):
         except:
             pass
         return page_names
-
-
-    @rx.var
-    def no_results(self) -> bool:
-        return self.is_searching or not self.original_results
-     
-    #Google OAUTH functions
-    @rx.var(cache=True)
+    
+    
+    """Google OAUTH functions"""
+    @rx.var(cache=True) # extracts the user's email from tokeninfo.
     def email(self) -> str:
-        """Extract the user's email from tokeninfo."""
-        tokeninfo = self.tokeninfo  # Access the reactive tokeninfo variable
-        # If tokeninfo exists and has an 'email' key, return it, otherwise return an empty string
+        # access the reactive tokeninfo variable
+        tokeninfo = self.tokeninfo  
+
+        # af tokeninfo exists and has an 'email' key, return it, otherwise return an empty string
         return tokeninfo["email"] if "email" in tokeninfo else ""
 
-    @rx.var(cache=True)
+    @rx.var
+    def privileged_email(self) -> bool:
+        email = self.email
+        return email in self.get_admins
+    
+    @rx.var(cache=True) # verifies and parses the user's ID token.
     def tokeninfo(self) -> dict[str, str]:
-        """Verify and parse the user's ID token."""
         try:
             return verify_oauth2_token(
                 json.loads(self.id_token_json)[
@@ -365,9 +380,8 @@ class State(rx.State):
                 print(f"Error verifying token: {exc}")
         return {}
 
-    @rx.var
+    @rx.var # checks if the user's token is valid
     def token_is_valid(self) -> bool:
-        """Check if the user's token is valid."""
         try:
             return bool(
                 self.tokeninfo
@@ -376,16 +390,16 @@ class State(rx.State):
             )
         except Exception:
             return False
-        
+       
+    # handles successful login and stores the ID token
     def on_login_success(self, id_token: dict):
-        """Handle successful login and store the ID token."""
         self.id_token_json = json.dumps(id_token)
         if self.privileged_email:
             return rx.redirect("/admin")
         return rx.redirect("/search")
     
+    # log the user out by clearing the ID token
     def logout(self):
-        """Log the user out by clearing the ID token."""
         self.id_token_json = ""
         self.clear_results()
         return rx.redirect("/")
@@ -397,11 +411,11 @@ class State(rx.State):
     def on_login_page(self):
         if self.token_is_valid:
             return rx.redirect("/search")
+    
 
-    #export CSV functions
-    @rx.event()
+    """export CSV functions"""
+    @rx.event() # export search results to a CSV with title, authors, pdf, and published date.
     def export_results_to_csv(self):
-        """Export search results to a CSV with title, authors, and published date."""
         if not self.results:
             print("No results to export!")
             return
