@@ -33,9 +33,10 @@ class State(rx.State):
     results: list[Article] = []
     original_results: list[Article] = []
 
-    # states to control button access in both search and admin pages
+    # states to control button access in both search, users and admin pages
     is_searching: bool = False
     is_populating: bool = False
+    is_removing: bool = False
 
     # sort states: default, ascending, descending
     sort_date_mode: str = "default"
@@ -121,7 +122,7 @@ class State(rx.State):
                 self.results = []
                 self.is_searching = False
                 end_time=time.time()
-            return rx.toast.error(f"No articles found for the given query in {end_time-start_time} seconds.")
+            return rx.toast.error(f"No articles found for the given query in {(end_time - start_time):.2f} seconds.")
 
         for _, result in ranked_articles.iterrows():
             # Filter out None values in authors
@@ -149,7 +150,7 @@ class State(rx.State):
                 self.reset_sort()
                 
 
-        return rx.toast.success(f"fetched {len(self.results)} articles in {end_time-start_time} seconds!")
+        return rx.toast.success(f"fetched {len(self.results)} articles in {(end_time - start_time):.2f} seconds!")
 
     @rx.event(background=True)
     async def populate_database(self):
@@ -177,14 +178,46 @@ class State(rx.State):
     
 
     """users page functions"""
-    @rx.event()
-    def add_admin(self):
-        G_db_manager.insert_admin(self.admin_entry)
-        self.clear_results()
+    @rx.event(background=True)
+    async def add_admin(self):
+        #validate email
+        async with self:
+            self.is_populating = True
+            start_time= time.time()
 
-    @rx.event()
-    def remove_admin(self, email: str):
-        G_db_manager.remove_admin(email)
+        try:
+            G_db_manager.insert_admin(self.admin_entry)
+        except Exception:
+            self.is_populating = False
+            return rx.toast.error(f"failed to insert {self.admin_entry} as an admin")
+        
+
+        async with self:
+            self.clear_results()
+            self.is_populating = False
+            end_time= time.time()
+
+        return rx.toast.success(f"inserted {self.admin_entry} as an admin within {(end_time - start_time):.2f} seconds")
+
+    @rx.event(background=True)
+    async def remove_admin(self, email: str):
+
+        async with self:
+            self.is_removing = True
+            start_time= time.time()
+
+        try:
+            G_db_manager.remove_admin(email)
+        except Exception:
+            self.is_removing = False
+            return rx.toast.error(f"failed to remove {email} from admins")
+
+        async with self:
+            self.is_removing = False
+            end_time= time.time()
+
+        return rx.toast.success(f"removed {email} as an admin within {(end_time - start_time):.2f} seconds")
+
 
     @rx.var
     def get_admins(self) -> list[str]:
@@ -332,7 +365,9 @@ class State(rx.State):
             self.sort_date_mode = "default"
             self.date_label = "Sort by Date"
 
-
+    @rx.var
+    def database_running(self) -> bool:
+        return self.is_searching or self.is_populating
 
     @rx.var
     def no_results(self) -> bool:

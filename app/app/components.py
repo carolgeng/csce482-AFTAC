@@ -22,7 +22,7 @@ def navigation_bar(self) -> rx.Component:
             rx.button(
                 "Logout", 
                 on_click=State.logout,
-                disabled=State.is_searching,
+                disabled=State.database_running,
                 background_color="grey"
             ),
             rx.foreach(
@@ -32,16 +32,16 @@ def navigation_bar(self) -> rx.Component:
                         button == "/search",
                         rx.button(
                             "Search",
-                            disabled=State.is_populating,
-                            background_color="red",
+                            disabled=State.database_running,
                             on_click=State.go_search,
+                            background_color="red",
                         )
                     ),
                     rx.cond(
                         button == "/admin",
                         rx.button(
                             "Admin",
-                            disabled=State.is_searching,
+                            disabled=State.database_running,
                             on_click=State.go_admin_page,
                             background_color="red",
                             padding="10px"
@@ -51,7 +51,7 @@ def navigation_bar(self) -> rx.Component:
                         button == "/users",
                         rx.button(
                             "Users",
-                            disabled=State.is_searching,
+                            disabled=State.database_running,
                             on_click=State.go_users,
                             background_color="red",
                             padding="10px"
