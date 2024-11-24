@@ -2,7 +2,7 @@
 
 import reflex as rx
 from ..state import State
-from ..components import require_google_login, navigation_bar, login, require_privilege
+from ..components import require_google_login, navigation_bar, require_privilege
 
 @rx.page(route="/admin",on_load=State.unprivileged_redirect)
 @require_google_login

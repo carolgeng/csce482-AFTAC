@@ -1,4 +1,3 @@
-import sys
 import requests
 from .DatabaseManager import DatabaseManager
 from .APIs.open_alex.open_alex_wrapper import OpenAlexAPIHandler

@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from app.database.arXiv_db_wrapper import ArxivDbWrapper
 from app.database.crossref_db_wrapper import CrossRefDbWrapper
 from app.database.open_alex_db_wrapper import OpenAlexDbWrapper
