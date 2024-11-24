@@ -19,7 +19,7 @@ def users_page() -> rx.Component:
                     rx.input(
                         placeholder="Enter admin email...",
                         on_change=State.set_admin_entry,
-                        value=State.admin_entry,
+                        # value=State.admin_entry,
                         width="300px"
                     ),
                     rx.button(
