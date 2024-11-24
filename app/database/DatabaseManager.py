@@ -1,5 +1,3 @@
-# app/database/DatabaseManager.py
-
 import os
 import psycopg2
 from psycopg2 import sql
@@ -397,6 +395,30 @@ class DatabaseManager:
         except Exception as e:
             print(f"Error reconstructing abstract: {e}")
             return None
+
+    def insert_admin(self, email: str):
+        query = sql.SQL("INSERT INTO admins(email) VALUES ({email})").format(email=sql.Placeholder())
+        try:
+            self.cursor.execute(query, [email])
+            return None
+        except Exception as e:
+            return e
+        
+    def remove_admin(self, email: str):
+        query = sql.SQL("DELETE FROM admins WHERE email = {email}").format(email=sql.Placeholder())
+        try:
+            self.cursor.execute(query, [email])
+            return None
+        except Exception as e:
+            return e
+                
+    def get_admins(self):
+        query = sql.SQL("SELECT * FROM admins")
+        try:
+            self.cursor.execute(query, [])
+            return self.cursor.fetchall()
+        except Exception as e:
+            return e
 
     def close(self):
         """Close the database connection."""

@@ -1,5 +1,3 @@
-# app/database/open_alex_db_wrapper.py
-
 import sys
 import requests
 from .DatabaseManager import DatabaseManager
