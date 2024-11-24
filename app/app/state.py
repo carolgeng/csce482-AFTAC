@@ -22,6 +22,7 @@ from io import StringIO
 load_dotenv()
 CLIENT_ID = os.getenv('CLIENT_ID')
 
+G_db_manager: DatabaseManager = DatabaseManager()
 
 class State(rx.State):
     # for oauth use token instead of goole client secret 
@@ -90,7 +91,7 @@ class State(rx.State):
     @rx.var
     def get_admins(self) -> list[str]:
         try:
-            return [t[1] for t in DatabaseManager().get_admins()]
+            return [t[1] for t in G_db_manager.get_admins()]
         except Exception:
             return rx.toast.error("Failed to display admins")
     
@@ -101,18 +102,17 @@ class State(rx.State):
 
     @rx.event
     def add_admin(self):
-        DatabaseManager().insert_admin(self.admin_entry)
+        G_db_manager.insert_admin(self.admin_entry)
         self.clear_results()
 
     @rx.event
     def remove_admin(self, email: str):
-        DatabaseManager().remove_admin(email)
+        G_db_manager.remove_admin(email)
 
     #UI components functions
     @rx.event(background=True)
     async def search_articles(self):
         """Function to handle article search and ranking."""
-
         if a := self.validate_input(): return a
 
         async with self:
@@ -146,6 +146,8 @@ class State(rx.State):
                 pdf_url=result['pdf_url'] or '#',
                 published=int(result['publication_year']) or -1,
                 journal_ref="",  # Update if journal references are available
+                cit_count=-1,
+                im_score=-1
             )
             new_results.append(article)
             # Update the results and is_searching flag inside async with self
