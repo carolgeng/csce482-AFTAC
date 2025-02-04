@@ -1,11 +1,12 @@
 
-# Fall 2024 Capstone Project  
+# Spring 2025 Capstone Project  
 
-This application is the Fall 2024 capstone project of:  
-- **Sulaiman Mulla** - <sulaiman_1@tamu.edu>  
-- **Sathvik Yeruva** - <sryeruva@tamu.edu>  
-- **Maria Viteri** - <mev@tamu.edu>  
-- **Alec Klem** - <alecklem@tamu.edu>  
+This application is the Sprint 2025 capstone project of:  
+- **Carol Geng** - <carolgeng@tamu.edu>  
+- **Spencer Logan** - <spencertlogan@tamu.edu>  
+- **Ren Mai** - <lauren.mai@tamu.edu>  
+- **Maximiliano Pombo Hernandez** - <maxpomboh@tamu.edu>
+- **Gabriel Serrano** - <gabrielserrano@tamu.edu>  
 
 ---
 
